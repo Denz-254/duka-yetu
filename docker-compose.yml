@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: duka_yetu
+    ports:
+      - "5433:5432"  # Different port
+    volumes:
+      - duka_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - duka-network
+
+  api:
+    build: .
+    ports:
+      - "8001:8000"  # Different port
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/duka_yetu
+      - ENVIRONMENT=development
+      - JWT_SECRET_KEY=dev-secret-key-change-in-production
+      - CORS_ORIGINS=http://localhost:5173,http://localhost:3000
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./app:/app/app
+      - ./tests:/app/tests
+      - ./migrations:/app/migrations
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - duka-network
+
+volumes:
+  duka_postgres_data:
+
+networks:
+  duka-network:
+    driver: bridge
