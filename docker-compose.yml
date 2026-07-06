@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   db:
     image: postgres:15
@@ -8,7 +6,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: duka_yetu
     ports:
-      - "5433:5432"  # Different port
+      - "5433:5432"
     volumes:
       - duka_postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -22,7 +20,7 @@ services:
   api:
     build: .
     ports:
-      - "8001:8000"  # Different port
+      - "8001:8000"
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/duka_yetu
       - ENVIRONMENT=development
@@ -35,6 +33,8 @@ services:
       - ./app:/app/app
       - ./tests:/app/tests
       - ./migrations:/app/migrations
+      - ./alembic.ini:/app/alembic.ini  # ✅ ADD THIS LINE
+      - ./docker-entrypoint.sh:/docker-entrypoint.sh  # ✅ ADD THIS LINE
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     networks:
       - duka-network
