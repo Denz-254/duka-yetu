@@ -34,4 +34,4 @@ isort==5.12.0
 
 # Utilities
 python-dateutil==2.8.2
-email-validator==2.1.1
+email-validator==2.3.0
