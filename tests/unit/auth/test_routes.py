@@ -3,7 +3,7 @@
 def test_register(client, test_business_data):
     """Test business registration."""
     response = client.post("/api/v1/auth/register", json=test_business_data)
-    assert response.status_code == 201
+    assert response.status_code == 201, f"Registration failed: {response.json()}"
     data = response.json()
     assert "user" in data
     assert "business" in data
@@ -22,10 +22,11 @@ def test_register_duplicate_email(client, test_business_data):
 
 def test_login(client, test_business_data):
     """Test user login."""
-    # First register
-    client.post("/api/v1/auth/register", json=test_business_data)
+    # Register
+    register_response = client.post("/api/v1/auth/register", json=test_business_data)
+    assert register_response.status_code == 201, f"Registration failed: {register_response.json()}"
     
-    # Then login
+    # Login
     login_data = {
         "username": test_business_data["username"],
         "password": test_business_data["password"]

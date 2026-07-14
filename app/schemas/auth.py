@@ -1,11 +1,9 @@
 """Authentication schemas for request/response validation."""
 
-from pydantic import BaseModel, EmailStr, Field, validator
+from pydantic import BaseModel, EmailStr, Field, validator, ConfigDict
 from typing import Optional
 from datetime import datetime
 import re
-
-# Request schemas
 
 class BusinessRegistrationRequest(BaseModel):
     """Business registration request."""
@@ -13,15 +11,20 @@ class BusinessRegistrationRequest(BaseModel):
     owner_name: str = Field(..., min_length=2, max_length=255)
     phone: str = Field(..., min_length=10, max_length=20)
     email: EmailStr
-    password: str = Field(..., min_length=8, max_length=72)  # ← Added max_length=72
+    password: str = Field(..., min_length=8, max_length=72)
     username: str = Field(..., min_length=3, max_length=100)
     
     @validator('phone')
     def validate_phone(cls, v):
         """Validate phone number format."""
-        if not re.match(r'^\+?[\d\s\-()]{10,20}$', v):
-            raise ValueError('Invalid phone number format')
-        return v
+        # Remove any non-digit characters except +
+        cleaned = re.sub(r'[^\d+]', '', v)
+        if not cleaned:
+            raise ValueError('Phone number cannot be empty')
+        # Check if it starts with + and has digits
+        if not re.match(r'^\+\d{10,15}$', cleaned):
+            raise ValueError('Invalid phone number format. Must be +254XXXXXXXXX')
+        return cleaned
     
     @validator('password')
     def validate_password(cls, v):
@@ -42,16 +45,6 @@ class LoginRequest(BaseModel):
     """Login request."""
     username: str
     password: str
-    
-    @validator('password')
-    def validate_password_length(cls, v):
-        """Validate password length for login."""
-        if len(v) > 72:
-            # Truncate silently for login (will be handled by security)
-            return v[:72]
-        return v
-
-# Response schemas
 
 class TokenResponse(BaseModel):
     """Token response."""
@@ -69,8 +62,7 @@ class UserResponse(BaseModel):
     role: str
     business_id: str
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class BusinessResponse(BaseModel):
     """Business response."""
@@ -83,8 +75,7 @@ class BusinessResponse(BaseModel):
     is_active: bool
     created_at: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class AuthResponse(BaseModel):
     """Authentication response with user and business data."""

@@ -2,6 +2,7 @@
 
 import pytest
 import os
+import uuid
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -49,13 +50,14 @@ def client(test_session):
 
 @pytest.fixture
 def test_business_data():
-    """Test business data - using unique data each time."""
-    import uuid
+    """Test business data - using valid phone numbers."""
     unique_id = str(uuid.uuid4())[:8]
+    # Generate a valid phone number - only digits
+    phone_digits = ''.join(filter(str.isdigit, str(uuid.uuid4()).replace('-', '')))[:9]
     return {
         "business_name": f"Test Business {unique_id}",
         "owner_name": f"Test Owner {unique_id}",
-        "phone": f"+254712345{unique_id[:4]}",
+        "phone": f"+2547{phone_digits[:8]}",  # Always valid format
         "email": f"test_{unique_id}@example.com",
         "password": "TestPass123",
         "username": f"testuser_{unique_id}"
