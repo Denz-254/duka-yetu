@@ -35,23 +35,24 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 # Copy application
 COPY . .
 
-# Create non-root user for security
+# Create non-root user
 RUN addgroup --system --gid 1001 appgroup && \
     adduser --system --uid 1001 appuser && \
     chown -R appuser:appgroup /app
 
+# Make entrypoint executable BEFORE switching user
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+
+# Switch to non-root user
 USER appuser
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD python -c "import requests; requests.get('http://localhost:8000/health')" || exit 1
 
-# Entrypoint
-COPY docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
+EXPOSE 8000
 
 ENTRYPOINT ["/docker-entrypoint.sh"]
-
-EXPOSE 8000
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
