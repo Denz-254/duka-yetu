@@ -6,7 +6,13 @@ def test_create_product(client, test_business_data):
     """Test product creation."""
     # Register and get token
     register_response = client.post("/api/v1/auth/register", json=test_business_data)
-    assert register_response.status_code == 201
+    
+    # If registration fails, show the error
+    if register_response.status_code != 201:
+        print(f"Registration failed: {register_response.status_code}")
+        print(f"Response: {register_response.json()}")
+        assert False, f"Registration failed with status {register_response.status_code}: {register_response.json()}"
+    
     data = register_response.json()
     token = data["token"]["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
@@ -31,7 +37,12 @@ def test_list_products(client, test_business_data):
     """Test listing products."""
     # Register and get token
     register_response = client.post("/api/v1/auth/register", json=test_business_data)
-    assert register_response.status_code == 201
+    
+    if register_response.status_code != 201:
+        print(f"Registration failed: {register_response.status_code}")
+        print(f"Response: {register_response.json()}")
+        assert False, f"Registration failed with status {register_response.status_code}: {register_response.json()}"
+    
     data = register_response.json()
     token = data["token"]["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
