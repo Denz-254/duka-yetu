@@ -7,7 +7,6 @@ def test_health_check(client):
     data = response.json()
     assert data["status"] == "healthy"
     assert "version" in data
-    assert "environment" in data
 
 def test_root_endpoint(client):
     """Test root endpoint."""

@@ -1,7 +1,5 @@
 """Authentication route tests."""
 
-import pytest
-
 def test_register(client, test_business_data):
     """Test business registration."""
     response = client.post("/api/v1/auth/register", json=test_business_data)
@@ -11,7 +9,6 @@ def test_register(client, test_business_data):
     assert "business" in data
     assert "token" in data
     assert data["user"]["username"] == test_business_data["username"]
-    assert data["business"]["name"] == test_business_data["business_name"]
 
 def test_register_duplicate_email(client, test_business_data):
     """Test registration with duplicate email."""

@@ -6,7 +6,9 @@ def test_create_product(client, test_business_data):
     """Test product creation."""
     # Register and get token
     register_response = client.post("/api/v1/auth/register", json=test_business_data)
-    token = register_response.json()["token"]["access_token"]
+    assert register_response.status_code == 201
+    data = register_response.json()
+    token = data["token"]["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
     
     # Create product
@@ -20,16 +22,18 @@ def test_create_product(client, test_business_data):
     }
     response = client.post("/api/v1/products/", json=product_data, headers=headers)
     assert response.status_code == 201
-    data = response.json()
-    assert data["name"] == product_data["name"]
-    assert data["sku"] == product_data["sku"]
-    assert "id" in data
+    product = response.json()
+    assert product["name"] == product_data["name"]
+    assert product["sku"] == product_data["sku"]
+    assert "id" in product
 
 def test_list_products(client, test_business_data):
     """Test listing products."""
     # Register and get token
     register_response = client.post("/api/v1/auth/register", json=test_business_data)
-    token = register_response.json()["token"]["access_token"]
+    assert register_response.status_code == 201
+    data = register_response.json()
+    token = data["token"]["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
     
     # Create a product
@@ -46,6 +50,6 @@ def test_list_products(client, test_business_data):
     # List products
     response = client.get("/api/v1/products/", headers=headers)
     assert response.status_code == 200
-    data = response.json()
-    assert "items" in data
-    assert data["total"] >= 1
+    result = response.json()
+    assert "items" in result
+    assert result["total"] >= 1
