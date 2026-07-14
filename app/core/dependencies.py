@@ -19,16 +19,6 @@ async def get_current_user(
 ) -> User:
     """
     Get the current authenticated user.
-    
-    Args:
-        credentials: HTTP Bearer credentials
-        db: Database session
-        
-    Returns:
-        User object
-        
-    Raises:
-        HTTPException: If authentication fails
     """
     token = credentials.credentials
     
@@ -67,16 +57,6 @@ async def get_current_business(
 ) -> Business:
     """
     Get the business for the current user.
-    
-    Args:
-        current_user: Current authenticated user
-        db: Database session
-        
-    Returns:
-        Business object
-        
-    Raises:
-        HTTPException: If business not found
     """
     business = db.query(Business).filter(
         Business.id == current_user.business_id
@@ -95,15 +75,6 @@ async def require_owner(
 ) -> User:
     """
     Require the user to have OWNER role.
-    
-    Args:
-        current_user: Current authenticated user
-        
-    Returns:
-        User object if role is OWNER
-        
-    Raises:
-        HTTPException: If user is not an owner
     """
     if current_user.role != "OWNER":
         raise HTTPException(
@@ -117,15 +88,6 @@ async def require_owner_or_admin(
 ) -> User:
     """
     Require the user to have OWNER or ADMIN role.
-    
-    Args:
-        current_user: Current authenticated user
-        
-    Returns:
-        User object if role is authorized
-        
-    Raises:
-        HTTPException: If user is not authorized
     """
     if current_user.role not in ["OWNER", "ADMIN"]:
         raise HTTPException(
@@ -139,16 +101,6 @@ async def get_cashier_user(
 ) -> User:
     """
     Get the cashier user for POS operations.
-    Cashiers can only create sales and view their own sales.
-    
-    Args:
-        current_user: Current authenticated user
-        
-    Returns:
-        User object
-        
-    Raises:
-        HTTPException: If user is not a cashier
     """
     if current_user.role != "CASHIER":
         raise HTTPException(
@@ -160,21 +112,11 @@ async def get_cashier_user(
 def get_tenant_id(request: Request) -> Optional[str]:
     """
     Extract tenant ID from request context.
-    
-    Args:
-        request: FastAPI request
-        
-    Returns:
-        Tenant ID if available
     """
     return getattr(request.state, "tenant_id", None)
 
 def set_tenant_id(request: Request, tenant_id: str) -> None:
     """
     Set tenant ID in request context.
-    
-    Args:
-        request: FastAPI request
-        tenant_id: Tenant ID
     """
     request.state.tenant_id = tenant_id
