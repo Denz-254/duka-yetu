@@ -1,15 +1,14 @@
 """Duka Yetu POS System - Main Application."""
 
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.responses import JSONResponse
-import uvicorn
 from datetime import datetime
 
 from app.core.config import settings
 from app.core.database import init_db
 from app.api import auth, products, sales, dashboard
+from app.domains.users.routes import router as users_router
 
 # Create FastAPI app
 app = FastAPI(
@@ -23,7 +22,7 @@ app = FastAPI(
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.get_cors_origins(),  # Use the method
+    allow_origins=settings.get_cors_origins() if hasattr(settings, 'get_cors_origins') else ["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -40,6 +39,7 @@ app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
 app.include_router(products.router, prefix="/api/v1/products", tags=["Products"])
 app.include_router(sales.router, prefix="/api/v1/sales", tags=["Sales"])
 app.include_router(dashboard.router, prefix="/api/v1/dashboard", tags=["Dashboard"])
+app.include_router(users_router, prefix="/api/v1", tags=["Users"])
 
 @app.on_event("startup")
 async def startup_event():
@@ -73,13 +73,5 @@ async def health_check():
         "version": settings.APP_VERSION,
         "timestamp": datetime.now().isoformat(),
         "environment": settings.ENVIRONMENT,
-        "database": "connected",  # Will be checked
+        "database": "connected",
     }
-
-if __name__ == "__main__":
-    uvicorn.run(
-        "app.main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=settings.DEBUG,
-    )

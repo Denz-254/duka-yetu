@@ -2,7 +2,7 @@
 
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, DateTime, Boolean, ForeignKey, Enum
+from sqlalchemy import Column, String, DateTime, Boolean, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -20,11 +20,13 @@ class User(Base):
     phone = Column(String(20))
     username = Column(String(100), nullable=False, unique=True, index=True)
     password_hash = Column(String(255), nullable=False)
-    role = Column(String(50), default="CASHIER", nullable=False)  # OWNER, ADMIN, MANAGER, CASHIER
+    role = Column(String(50), default="CASHIER", nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
     login_time = Column(DateTime)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    # branch_id - for multi-branch support (optional)
+    branch_id = Column(UUID(as_uuid=True), nullable=True)
     
     # Relationships
     business = relationship("Business", back_populates="users")

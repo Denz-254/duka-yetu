@@ -13,7 +13,8 @@ class DashboardOverview(BaseModel):
     total_products_value: Decimal
     low_stock_count: int
     total_staff: int
-    total_businesses: Optional[int] = None  # For super admin
+    total_sales_all_time: int
+    total_revenue_all_time: Decimal
 
 class DailySalesData(BaseModel):
     """Daily sales data point."""
@@ -41,3 +42,20 @@ class LowStockResponse(BaseModel):
     """Low stock products response."""
     items: List[LowStockProduct]
     count: int
+
+class RecentSale(BaseModel):
+    """Recent sale for dashboard."""
+    id: str
+    receipt_number: str
+    cashier_name: str
+    total_amount: Decimal
+    payment_method: str
+    sale_date: datetime
+
+class CashierDashboardResponse(BaseModel):
+    """Cashier dashboard response."""
+    today_sales_count: int
+    today_revenue: Decimal
+    recent_sales: List[RecentSale]
+    total_sales_all_time: int
+    total_revenue_all_time: Decimal
