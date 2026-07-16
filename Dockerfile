@@ -35,6 +35,9 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 # Copy application
 COPY . .
 
+# Copy alembic.ini explicitly
+COPY alembic.ini /app/alembic.ini
+
 # Create non-root user
 RUN addgroup --system --gid 1001 appgroup && \
     adduser --system --uid 1001 appuser && \

@@ -1,10 +1,10 @@
 """Sale schemas for request/response validation."""
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, validator, ConfigDict
 from typing import List, Optional
 from datetime import datetime
 from decimal import Decimal
-import uuid
+from uuid import UUID
 
 class SaleItemCreate(BaseModel):
     """Sale item creation request."""
@@ -13,7 +13,6 @@ class SaleItemCreate(BaseModel):
     
     @validator('quantity')
     def validate_quantity(cls, v):
-        """Validate quantity."""
         if v <= 0:
             raise ValueError('Quantity must be greater than 0')
         return v
@@ -25,7 +24,6 @@ class SaleCreate(BaseModel):
     
     @validator('payment_method')
     def validate_payment_method(cls, v):
-        """Validate payment method."""
         allowed = ["CASH", "MPESA", "CARD", "BANK"]
         if v.upper() not in allowed:
             raise ValueError(f'Payment method must be one of: {", ".join(allowed)}')
@@ -41,8 +39,13 @@ class SaleItemResponse(BaseModel):
     unit_price: Decimal
     subtotal: Decimal
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
+    
+    @validator('id', 'product_id', pre=True)
+    def convert_uuid_to_str(cls, v):
+        if isinstance(v, UUID):
+            return str(v)
+        return v
 
 class SaleResponse(BaseModel):
     """Sale response."""
@@ -56,13 +59,18 @@ class SaleResponse(BaseModel):
     payment_status: str
     sale_date: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
+    
+    @validator('id', 'cashier_id', pre=True)
+    def convert_uuid_to_str(cls, v):
+        if isinstance(v, UUID):
+            return str(v)
+        return v
 
 class SaleReceiptResponse(SaleResponse):
     """Sale response with receipt HTML."""
     receipt_html: str
-    
+
 class SaleListResponse(BaseModel):
     """Sale list response with pagination."""
     items: List[SaleResponse]
@@ -70,6 +78,3 @@ class SaleListResponse(BaseModel):
     page: int
     pages: int
     per_page: int
-    
-    class Config:
-        from_attributes = True
