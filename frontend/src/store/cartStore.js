@@ -24,6 +24,7 @@ const useCartStore = create((set, get) => ({
             sku: product.sku,
             selling_price: product.selling_price,
             stock_quantity: product.stock_quantity,
+            image_url: product.image_url || null, // ← ADD THIS
             quantity: quantity,
           },
         ];

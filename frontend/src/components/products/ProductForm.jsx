@@ -61,10 +61,9 @@ const ProductForm = ({ product, onSuccess, onCancel }) => {
     formData.append('file', file);
 
     try {
-      const response = await api.post('/upload/', formData, {  // ← Trailing slash
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+      const response = await api.post('/upload/', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 30000, // Increase to 30 seconds
       });
 
       setImagePreview(response.data.url);
