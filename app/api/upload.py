@@ -1,31 +1,39 @@
 """Image upload routes for Duka Yetu."""
 
-import cloudinary
-import cloudinary.uploader
 from fastapi import APIRouter, File, UploadFile, HTTPException, Depends
 from fastapi.responses import JSONResponse
-from app.core.config import settings
 from app.core.dependencies import get_current_user
+from app.core.config import settings
 
 router = APIRouter()
 
-# Configure Cloudinary
-cloudinary.config(
-    cloud_name=settings.CLOUDINARY_CLOUD_NAME,
-    api_key=settings.CLOUDINARY_API_KEY,
-    api_secret=settings.CLOUDINARY_API_SECRET
-)
+# Try to import cloudinary, but handle gracefully if not installed
+try:
+    import cloudinary
+    import cloudinary.uploader
+    
+    cloudinary.config(
+        cloud_name=settings.CLOUDINARY_CLOUD_NAME,
+        api_key=settings.CLOUDINARY_API_KEY,
+        api_secret=settings.CLOUDINARY_API_SECRET
+    )
+    CLOUDINARY_AVAILABLE = True
+except ImportError:
+    CLOUDINARY_AVAILABLE = False
+    print("⚠️ Cloudinary not installed - upload endpoint disabled")
 
 @router.post("/upload")
 async def upload_image(
     file: UploadFile = File(...),
     current_user = Depends(get_current_user)
 ):
-    """
-    Upload an image to Cloudinary.
+    """Upload an image to Cloudinary."""
+    if not CLOUDINARY_AVAILABLE:
+        raise HTTPException(
+            status_code=503,
+            detail="Cloudinary service is not available"
+        )
     
-    Only authenticated users can upload images.
-    """
     try:
         # Validate file type
         if not file.content_type.startswith('image/'):
@@ -61,6 +69,7 @@ async def upload_image(
             }
         )
     except Exception as e:
+        print(f"Upload error: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail=f"Upload failed: {str(e)}"

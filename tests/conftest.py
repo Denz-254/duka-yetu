@@ -2,11 +2,28 @@
 
 import pytest
 import os
-import uuid
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool
+
+# Mock cloudinary for tests if not installed
+try:
+    import cloudinary
+    import cloudinary.uploader
+except ImportError:
+    # Create mock for cloudinary
+    class MockCloudinary:
+        def config(self, *args, **kwargs):
+            pass
+        def uploader(self):
+            return self
+        def upload(self, file, folder=None, **kwargs):
+            return {"secure_url": "https://example.com/mock-image.jpg", "public_id": "mock-id"}
+    
+    cloudinary = MockCloudinary()
+    cloudinary.uploader = cloudinary
+    cloudinary.config = cloudinary.config
 
 from app.main import app
 from app.core.database import Base, get_db
@@ -50,14 +67,13 @@ def client(test_session):
 
 @pytest.fixture
 def test_business_data():
-    """Test business data - using valid phone numbers."""
+    """Test business data."""
+    import uuid
     unique_id = str(uuid.uuid4())[:8]
-    # Generate a valid phone number - only digits
-    phone_digits = ''.join(filter(str.isdigit, str(uuid.uuid4()).replace('-', '')))[:9]
     return {
         "business_name": f"Test Business {unique_id}",
         "owner_name": f"Test Owner {unique_id}",
-        "phone": f"+2547{phone_digits[:8]}",  # Always valid format
+        "phone": f"+254712345{unique_id[:4]}",
         "email": f"test_{unique_id}@example.com",
         "password": "TestPass123",
         "username": f"testuser_{unique_id}"
