@@ -11,13 +11,9 @@ from app.core.config import settings
 # Create base class for models
 Base = declarative_base()
 
-# Update DATABASE_URL to use psycopg driver
-# This line is the key change:
-database_url = settings.DATABASE_URL.replace("postgresql://", "postgresql+psycopg://")
-
-# Create engine with updated URL
+# Create engine - using psycopg2-binary instead of psycopg
 engine = create_engine(
-    database_url,  # Changed from settings.DATABASE_URL
+    settings.DATABASE_URL,
     pool_size=settings.DATABASE_POOL_SIZE,
     max_overflow=settings.DATABASE_MAX_OVERFLOW,
     pool_pre_ping=True,
