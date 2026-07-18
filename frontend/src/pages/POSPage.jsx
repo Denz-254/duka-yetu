@@ -1,6 +1,11 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaSearch, FaPlus, FaMinus, FaTrash, FaCashRegister, FaShoppingCart, FaTimes } from 'react-icons/fa';
+import { 
+  FaSearch, FaPlus, FaMinus, FaTrash, FaCashRegister, 
+  FaShoppingCart, FaTimes, FaBarcode, FaUser,
+  FaCreditCard, FaMoneyBillWave, FaMobileAlt,
+  FaPrint, FaReceipt
+} from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
 import useCartStore from '../store/cartStore';
 import useAuthStore from '../store/authStore';
@@ -13,6 +18,7 @@ const POSPage = () => {
   const [loading, setLoading] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
   const [receiptData, setReceiptData] = useState(null);
+  const [paymentMethod, setPaymentMethod] = useState('CASH');
   const { items, total, addItem, removeItem, updateQuantity, clearCart } = useCartStore();
   const user = useAuthStore((state) => state.user);
 
@@ -50,7 +56,7 @@ const POSPage = () => {
           product_id: item.id,
           quantity: item.quantity,
         })),
-        payment_method: 'CASH',
+        payment_method: paymentMethod,
       };
 
       const response = await api.post('/sales/', saleData);
@@ -66,18 +72,29 @@ const POSPage = () => {
     }
   };
 
+  const paymentMethods = [
+    { value: 'CASH', icon: FaMoneyBillWave, label: 'Cash' },
+    { value: 'MPESA', icon: FaMobileAlt, label: 'M-Pesa' },
+    { value: 'CARD', icon: FaCreditCard, label: 'Card' },
+  ];
+
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-          <FaCashRegister className="text-primary-600" />
-          Point of Sale
-        </h1>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+            <FaCashRegister className="text-primary-600" />
+            Point of Sale
+          </h1>
+          <p className="text-gray-500 text-sm mt-1">Quick and easy checkout for your customers</p>
+        </div>
         <div className="flex items-center gap-4">
-          <span className="text-sm text-gray-500">
-            Cashier: {user?.name || 'Unknown'}
-          </span>
-          <div className="flex items-center gap-1 text-sm text-gray-500">
+          <div className="flex items-center gap-2 text-sm text-gray-500 bg-white px-4 py-2 rounded-lg border border-gray-100">
+            <FaUser className="text-primary-600" />
+            <span>{user?.name || 'Cashier'}</span>
+          </div>
+          <div className="flex items-center gap-1 text-sm text-gray-500 bg-white px-4 py-2 rounded-lg border border-gray-100">
             <FaShoppingCart />
             <span>{items.length} items</span>
           </div>
@@ -87,7 +104,7 @@ const POSPage = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Products */}
         <div className="lg:col-span-2">
-          <div className="card">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
             <div className="relative mb-4">
               <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
@@ -104,12 +121,12 @@ const POSPage = () => {
                 <div className="text-gray-400">Loading products...</div>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 max-h-[550px] overflow-y-auto p-1">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[550px] overflow-y-auto p-1">
                 {filteredProducts.map((product) => (
                   <motion.div
                     key={product.id}
-                    whileHover={{ scale: 1.03 }}
-                    whileTap={{ scale: 0.97 }}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
                     className={`rounded-xl overflow-hidden shadow-sm border cursor-pointer transition-all duration-200 ${
                       product.stock_quantity > 0
                         ? 'hover:shadow-md border-gray-200 hover:border-primary-300'
@@ -124,8 +141,7 @@ const POSPage = () => {
                       }
                     }}
                   >
-                    {/* Product Image */}
-                    <div className="w-full h-40 bg-gray-100 overflow-hidden">
+                    <div className="w-full h-32 bg-gray-100 overflow-hidden">
                       {product.image_url ? (
                         <img
                           src={product.image_url}
@@ -135,14 +151,12 @@ const POSPage = () => {
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-gray-400 bg-gray-50">
                           <div className="text-center">
-                            <div className="text-4xl mb-1">📦</div>
+                            <FaBarcode className="text-3xl mx-auto mb-1" />
                             <span className="text-xs">No image</span>
                           </div>
                         </div>
                       )}
                     </div>
-
-                    {/* Product Info */}
                     <div className="p-3 bg-white">
                       <h3 className="font-medium text-sm text-gray-800 truncate">{product.name}</h3>
                       <div className="flex items-center justify-between mt-1">
@@ -154,7 +168,7 @@ const POSPage = () => {
                             ? 'bg-red-100 text-red-600'
                             : 'bg-green-100 text-green-600'
                         }`}>
-                          {product.stock_quantity} in stock
+                          {product.stock_quantity} left
                         </span>
                       </div>
                     </div>
@@ -175,7 +189,7 @@ const POSPage = () => {
 
         {/* Cart */}
         <div className="lg:col-span-1">
-          <div className="card sticky top-4">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 sticky top-4">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-gray-800">Cart</h2>
               {items.length > 0 && (
@@ -188,7 +202,7 @@ const POSPage = () => {
               )}
             </div>
 
-            <div className="space-y-2 max-h-[350px] overflow-y-auto">
+            <div className="space-y-2 max-h-[280px] overflow-y-auto">
               <AnimatePresence>
                 {items.map((item) => (
                   <motion.div
@@ -198,7 +212,6 @@ const POSPage = () => {
                     exit={{ opacity: 0, x: 20 }}
                     className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
                   >
-                    {/* Cart Item Image */}
                     <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-200 flex-shrink-0">
                       {item.image_url ? (
                         <img
@@ -207,8 +220,8 @@ const POSPage = () => {
                           className="w-full h-full object-cover"
                         />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
-                          📦
+                        <div className="w-full h-full flex items-center justify-center text-gray-400 text-xl">
+                          <FaBarcode />
                         </div>
                       )}
                     </div>
@@ -255,27 +268,56 @@ const POSPage = () => {
             )}
 
             {items.length > 0 && (
-              <div className="border-t border-gray-200 pt-4 mt-4">
-                <div className="flex justify-between text-lg font-bold">
-                  <span>Total:</span>
-                  <span className="text-primary-600">{formatCurrency(total)}</span>
+              <>
+                {/* Payment Method */}
+                <div className="mt-4 border-t border-gray-200 pt-4">
+                  <label className="text-sm font-medium text-gray-700 block mb-2">Payment Method</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {paymentMethods.map((method) => {
+                      const Icon = method.icon;
+                      return (
+                        <button
+                          key={method.value}
+                          onClick={() => setPaymentMethod(method.value)}
+                          className={`flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm transition-all duration-200 ${
+                            paymentMethod === method.value
+                              ? 'bg-primary-600 text-white'
+                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          }`}
+                        >
+                          <Icon className="text-sm" />
+                          <span>{method.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
-                <button
-                  onClick={handleCheckout}
-                  disabled={loading}
-                  className="btn-primary w-full mt-4 py-3 text-lg"
-                >
-                  {loading ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <span className="animate-spin">⏳</span>
-                      Processing...
-                    </span>
-                  ) : (
-                    'Checkout'
-                  )}
-                </button>
-              </div>
+                <div className="border-t border-gray-200 pt-4 mt-4">
+                  <div className="flex justify-between text-lg font-bold">
+                    <span>Total:</span>
+                    <span className="text-primary-600">{formatCurrency(total)}</span>
+                  </div>
+
+                  <button
+                    onClick={handleCheckout}
+                    disabled={loading}
+                    className="btn-primary w-full mt-4 py-3 text-lg flex items-center justify-center gap-2"
+                  >
+                    {loading ? (
+                      <span className="flex items-center gap-2">
+                        <span className="animate-spin">⏳</span>
+                        Processing...
+                      </span>
+                    ) : (
+                      <>
+                        <FaReceipt />
+                        Complete Sale
+                      </>
+                    )}
+                  </button>
+                </div>
+              </>
             )}
           </div>
         </div>
@@ -291,12 +333,20 @@ const POSPage = () => {
           >
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold text-gray-800">Receipt</h2>
-              <button
-                onClick={() => setShowReceipt(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <FaTimes className="text-xl" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => window.print()}
+                  className="p-2 text-gray-400 hover:text-primary-600 rounded-lg hover:bg-primary-50 transition-colors"
+                >
+                  <FaPrint />
+                </button>
+                <button
+                  onClick={() => setShowReceipt(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <FaTimes className="text-xl" />
+                </button>
+              </div>
             </div>
             <div
               className="prose prose-sm max-w-none"

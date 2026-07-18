@@ -190,6 +190,15 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Debug - Check Frontend Files
+        run: |
+          echo "=== Checking frontend files ==="
+          ls -la frontend/
+          echo "=== Checking Dockerfile ==="
+          cat frontend/Dockerfile || echo "Dockerfile not found"
+          echo "=== Checking package.json ==="
+          cat frontend/package.json || echo "package.json not found"
+
       - name: Extract metadata for Frontend
         id: meta-frontend
         uses: docker/metadata-action@v5
@@ -200,6 +209,7 @@ jobs:
             type=sha,format=short,prefix=sha-
             type=raw,value=latest-frontend,enable=${{ github.ref == 'refs/heads/main' }}
             type=raw,value=develop-frontend,enable=${{ github.ref == 'refs/heads/develop' }}
+            type=raw,value=frontend,enable=true
 
       - name: Build and push Frontend image
         uses: docker/build-push-action@v5
@@ -211,3 +221,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           file: frontend/Dockerfile
+          platforms: linux/amd64
+          provenance: false
+          sbom: false
