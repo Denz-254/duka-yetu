@@ -11,10 +11,11 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
   DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
 
 jobs:
   test:
-    name: 🧪 Run Tests
+    name: Run Tests
     runs-on: ubuntu-latest
     
     services:
@@ -118,11 +119,11 @@ jobs:
           if [ -d "tests" ] && [ "$(ls -A tests 2>/dev/null)" ]; then
             pytest tests/ -v --tb=short --cov=app --cov-report=term
           else
-            echo "⚠️ No tests found, skipping..."
+            echo "No tests found, skipping..."
           fi
 
   build-backend:
-    name: 🐳 Build & Push Backend
+    name: Build and Push Backend to GHCR
     runs-on: ubuntu-latest
     needs: test
     if: github.event_name != 'pull_request'
@@ -154,7 +155,6 @@ jobs:
             type=sha,format=short,prefix=sha-
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
             type=raw,value=develop,enable=${{ github.ref == 'refs/heads/develop' }}
-            type=raw,value=backend,enable=true
 
       - name: Build and push Backend image
         uses: docker/build-push-action@v5
@@ -166,12 +166,9 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           file: Dockerfile
-          build-args: |
-            BUILD_DATE=${{ github.event.repository.updated_at }}
-            VERSION=${{ github.sha }}
 
   build-frontend:
-    name: 🎨 Build & Push Frontend
+    name: Build and Push Frontend to GHCR
     runs-on: ubuntu-latest
     needs: test
     if: github.event_name != 'pull_request'
@@ -203,7 +200,6 @@ jobs:
             type=sha,format=short,prefix=sha-
             type=raw,value=latest-frontend,enable=${{ github.ref == 'refs/heads/main' }}
             type=raw,value=develop-frontend,enable=${{ github.ref == 'refs/heads/develop' }}
-            type=raw,value=frontend,enable=true
 
       - name: Build and push Frontend image
         uses: docker/build-push-action@v5
@@ -215,31 +211,3 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           file: frontend/Dockerfile
-          build-args: |
-            BUILD_DATE=${{ github.event.repository.updated_at }}
-            VERSION=${{ github.sha }}
-
-  deploy:
-    name: 🚀 Deploy to Production
-    runs-on: ubuntu-latest
-    needs: [build-backend, build-frontend]
-    if: github.ref == 'refs/heads/main'
-    environment: production
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Deploy to Render (API)
-        uses: johnbeynon/render-deploy-action@v1
-        with:
-          service-id: ${{ secrets.RENDER_API_SERVICE_ID }}
-          api-key: ${{ secrets.RENDER_API_KEY }}
-          wait-for-success: true
-
-      - name: Deploy to Render (Frontend)
-        uses: johnbeynon/render-deploy-action@v1
-        with:
-          service-id: ${{ secrets.RENDER_FRONTEND_SERVICE_ID }}
-          api-key: ${{ secrets.RENDER_API_KEY }}
-          wait-for-success: true
