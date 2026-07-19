@@ -1,12 +1,53 @@
-"""Startup seeding helpers (super admin)."""
+"""Startup seeding helpers (super admin + schema patches)."""
 
 from datetime import datetime
 
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.security import get_password_hash
 from app.models.user import User
+
+
+def ensure_schema_patches(db: Session) -> None:
+    """Apply critical missing columns when Alembic hasn't run yet (e.g. volume mounts)."""
+    # products.category_id — required by Product model / marketplace
+    exists = db.execute(
+        text(
+            """
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name = 'products' AND column_name = 'category_id'
+            """
+        )
+    ).scalar()
+    if not exists:
+        db.execute(text("ALTER TABLE products ADD COLUMN category_id UUID"))
+        db.execute(
+            text(
+                """
+                DO $$ BEGIN
+                  IF NOT EXISTS (
+                    SELECT 1 FROM pg_constraint WHERE conname = 'fk_products_category_id'
+                  ) THEN
+                    ALTER TABLE products
+                      ADD CONSTRAINT fk_products_category_id
+                      FOREIGN KEY (category_id) REFERENCES categories(id);
+                  END IF;
+                END $$;
+                """
+            )
+        )
+        db.execute(
+            text(
+                """
+                CREATE INDEX IF NOT EXISTS ix_products_category_id
+                ON products (category_id)
+                """
+            )
+        )
+        db.commit()
+        print("✅ Schema patch: products.category_id added")
 
 
 def ensure_super_admin(db: Session) -> None:

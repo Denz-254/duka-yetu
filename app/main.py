@@ -9,7 +9,7 @@ from datetime import datetime
 from app.core.config import settings
 from app.core.database import init_db, engine, SessionLocal
 from app.api import auth, products, sales, dashboard, upload, subscription, resources, payments, admin, marketplace, orders
-from app.core.bootstrap import ensure_super_admin
+from app.core.bootstrap import ensure_schema_patches, ensure_super_admin
 from app.core.dependencies import require_feature
 from app.domains.users.routes import router as users_router
 from app.models.mpesa_transaction import MpesaTransaction  # noqa: F401 — register model
@@ -30,6 +30,7 @@ async def lifespan(app: FastAPI):
 
     db = SessionLocal()
     try:
+        ensure_schema_patches(db)
         ensure_super_admin(db)
     finally:
         db.close()
