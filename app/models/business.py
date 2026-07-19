@@ -27,6 +27,10 @@ class Business(Base):
     profile = Column(JSON, default=dict, nullable=False)
     settings = Column(JSON, default=dict, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
+    # PENDING | APPROVED | REJECTED — super admin gate before using POS features
+    approval_status = Column(String(20), default="PENDING", nullable=False, index=True)
+    approved_at = Column(DateTime)
+    rejection_reason = Column(String(500))
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     

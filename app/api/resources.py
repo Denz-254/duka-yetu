@@ -265,6 +265,47 @@ def update_business_profile(
     return get_business_profile(business, _access)
 
 
+_PAYMENT_SECRET_KEYS = {
+    "mpesa_consumer_key",
+    "mpesa_consumer_secret",
+    "mpesa_passkey",
+    "stripe_secret_key",
+}
+
+
+def _public_settings(section: str, values: dict) -> dict:
+    """Never return raw gateway secrets to the browser."""
+    data = dict(values or {})
+    if section != "payment":
+        for key in list(data.keys()):
+            if any(marker in key.lower() for marker in ("secret", "passkey", "private_key")):
+                data.pop(key, None)
+        return data
+
+    for key in _PAYMENT_SECRET_KEYS:
+        stored = data.pop(key, None)
+        data[f"{key}_set"] = bool(stored)
+    return data
+
+
+def _merge_payment_settings(existing: dict, incoming: dict) -> dict:
+    merged = {**(existing or {}), **(incoming or {})}
+    for key in _PAYMENT_SECRET_KEYS:
+        value = incoming.get(key) if incoming else None
+        # Keep previous secret when UI sends blank / masked placeholder.
+        if value is None or value == "" or str(value).startswith("••••"):
+            if key in (existing or {}):
+                merged[key] = existing[key]
+            else:
+                merged.pop(key, None)
+        else:
+            merged[key] = str(value).strip()
+    if "mpesa_account_type" in merged:
+        account_type = str(merged["mpesa_account_type"]).lower()
+        merged["mpesa_account_type"] = account_type if account_type in {"paybill", "till"} else "paybill"
+    return merged
+
+
 @router.get("/business/settings/{section}")
 def get_business_settings(
     section: str,
@@ -273,7 +314,7 @@ def get_business_settings(
 ):
     if section not in {"payment", "receipt", "tax", "security"}:
         raise HTTPException(status_code=404, detail="Settings section not found")
-    return (business.settings or {}).get(section, {})
+    return _public_settings(section, (business.settings or {}).get(section, {}))
 
 
 @router.put("/business/settings")
@@ -284,12 +325,27 @@ def update_business_settings(
     _owner: User = Depends(require_owner),
     _access: Business = Depends(require_feature("business_settings")),
 ):
-    sensitive_markers = ("secret", "passkey", "private_key")
-    if any(marker in key.lower() for key in payload.values for marker in sensitive_markers):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Secret credentials must be configured in the backend environment.",
-        )
-    business.settings = {**(business.settings or {}), payload.section: payload.values}
+    current = dict(business.settings or {})
+    existing_section = dict(current.get(payload.section) or {})
+
+    if payload.section == "payment":
+        # Stripe secret keys remain env-only; M-Pesa secrets are per-business.
+        if payload.values.get("stripe_secret_key"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Stripe secret keys must be configured in the backend environment.",
+            )
+        values = _merge_payment_settings(existing_section, payload.values)
+    else:
+        sensitive_markers = ("secret", "passkey", "private_key")
+        if any(marker in key.lower() for key in payload.values for marker in sensitive_markers):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Secret credentials must be configured in the backend environment.",
+            )
+        values = {**existing_section, **payload.values}
+
+    current[payload.section] = values
+    business.settings = current
     db.commit()
-    return payload.values
+    return _public_settings(payload.section, values)

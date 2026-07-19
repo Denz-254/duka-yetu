@@ -57,7 +57,7 @@ class UserResponse(BaseModel):
     phone: Optional[str] = None
     username: str
     role: str
-    business_id: str
+    business_id: Optional[str] = None
     is_active: bool = True
 
 
@@ -69,6 +69,7 @@ class BusinessResponse(BaseModel):
     email: str
     package: str
     is_active: bool
+    approval_status: str = "APPROVED"
     created_at: datetime
 
 
@@ -80,5 +81,6 @@ class TokenResponse(BaseModel):
 
 class AuthResponse(BaseModel):
     user: UserResponse
-    business: BusinessResponse
+    business: Optional[BusinessResponse] = None
     token: TokenResponse
+    message: Optional[str] = None

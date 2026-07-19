@@ -6,6 +6,8 @@ from app.models.product import Product
 from app.models.sale import Sale
 from app.models.sale_item import SaleItem
 from app.models.resources import Branch, Category, Customer, Supplier
+from app.models.mpesa_transaction import MpesaTransaction
+from app.models.online_order import Notification, OnlineOrder
 
 __all__ = [
     "Business",
@@ -17,4 +19,7 @@ __all__ = [
     "Category",
     "Customer",
     "Supplier",
+    "MpesaTransaction",
+    "OnlineOrder",
+    "Notification",
 ]

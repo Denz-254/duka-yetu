@@ -185,29 +185,18 @@ async def get_cashier_dashboard(
     today = datetime.now().date()
     today_start = datetime.combine(today, datetime.min.time())
     
-    # Cashier's today's sales
+    # Cashier sees only their own daily sales — never all-time business revenue
     today_sales = db.query(Sale).filter(
         Sale.business_id == current_user.business_id,
         Sale.user_id == current_user.id,
-        Sale.sale_date >= today_start
-    ).all()
+        Sale.sale_date >= today_start,
+        Sale.payment_status == "PAID",
+    ).order_by(desc(Sale.sale_date)).all()
     today_sales_count = len(today_sales)
     today_revenue = sum(sale.total_amount for sale in today_sales)
-    
-    # Cashier's all time sales
-    all_sales = db.query(Sale).filter(
-        Sale.business_id == current_user.business_id,
-        Sale.user_id == current_user.id
-    ).all()
-    total_sales_all_time = len(all_sales)
-    total_revenue_all_time = sum(sale.total_amount for sale in all_sales)
-    
-    # Recent sales (last 10)
-    recent_sales = db.query(Sale).filter(
-        Sale.business_id == current_user.business_id,
-        Sale.user_id == current_user.id
-    ).order_by(desc(Sale.sale_date)).limit(10).all()
-    
+    today_cash_count = sum(1 for sale in today_sales if sale.payment_method == "CASH")
+    today_mpesa_count = sum(1 for sale in today_sales if sale.payment_method == "MPESA")
+
     recent_items = [
         RecentSale(
             id=str(sale.id),
@@ -217,13 +206,13 @@ async def get_cashier_dashboard(
             payment_method=sale.payment_method,
             sale_date=sale.sale_date,
         )
-        for sale in recent_sales
+        for sale in today_sales[:10]
     ]
     
     return CashierDashboardResponse(
         today_sales_count=today_sales_count,
         today_revenue=Decimal(str(today_revenue)),
         recent_sales=recent_items,
-        total_sales_all_time=total_sales_all_time,
-        total_revenue_all_time=Decimal(str(total_revenue_all_time)),
+        today_cash_count=today_cash_count,
+        today_mpesa_count=today_mpesa_count,
     )

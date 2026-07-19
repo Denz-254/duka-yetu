@@ -58,6 +58,25 @@ class Settings(BaseSettings):
     STRIPE_ENTERPRISE_MONTHLY_PRICE_ID: str = Field(default="")
     STRIPE_ENTERPRISE_YEARLY_PRICE_ID: str = Field(default="")
 
+    # Public API base used for Safaricom callbacks (use ngrok/cloud URL in sandbox)
+    API_BASE_URL: str = Field(default="http://localhost:8001")
+    MPESA_CALLBACK_BASE_URL: str = Field(default="")
+
+    # Platform-level Daraja credentials (sandbox defaults / fallback)
+    MPESA_ENVIRONMENT: str = Field(default="sandbox")  # sandbox | production
+    MPESA_CONSUMER_KEY: str = Field(default="")
+    MPESA_CONSUMER_SECRET: str = Field(default="")
+    MPESA_PASSKEY: str = Field(default="")
+    MPESA_SHORTCODE: str = Field(default="174379")
+
+    # Super admin bootstrap credentials
+    SUPER_ADMIN_USERNAME: str = Field(default="superadmin")
+    SUPER_ADMIN_PASSWORD: str = Field(default="")
+    SUPER_ADMIN_EMAIL: str = Field(default="superadmin@dukayetu.local")
+
+    # Marketplace commission percent taken from online orders
+    MARKETPLACE_COMMISSION_PERCENT: float = Field(default=5.0)
+
     # Use ConfigDict instead of class Config
     model_config = ConfigDict(
         env_file=".env",

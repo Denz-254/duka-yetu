@@ -42,6 +42,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
   const navItems = [
     { path: '/dashboard', icon: FaHome, label: 'Dashboard', feature: 'basic_reports' },
     { path: '/pos', icon: FaShoppingCart, label: 'POS', feature: 'pos' },
+    { path: '/orders', icon: FaClipboardList, label: 'Online Orders', feature: 'pos' },
   ];
 
   const inventoryItems = [

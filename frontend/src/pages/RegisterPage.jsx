@@ -26,8 +26,8 @@ const RegisterPage = () => {
     e.preventDefault();
     const result = await register(formData);
     if (result.success) {
-      toast.success('Account created successfully!');
-      navigate('/dashboard');
+      toast.success(result.message || 'Registration submitted for approval');
+      navigate('/pending-approval');
     } else {
       toast.error(result.error || 'Registration failed');
     }

@@ -52,6 +52,17 @@ async def get_current_user(
     
     return user
 
+async def require_super_admin(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    if current_user.role != "SUPER_ADMIN":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Super admin access required",
+        )
+    return current_user
+
+
 async def get_current_business(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -59,6 +70,17 @@ async def get_current_business(
     """
     Get the business for the current user.
     """
+    if current_user.role == "SUPER_ADMIN":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Super admin accounts are not tied to a store business",
+        )
+    if not current_user.business_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Business not found",
+        )
+
     business = db.query(Business).filter(
         Business.id == current_user.business_id
     ).first()
@@ -67,6 +89,12 @@ async def get_current_business(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Business not found",
+        )
+
+    if (business.approval_status or "PENDING") != "APPROVED":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your business is awaiting platform approval. You cannot use POS features yet.",
         )
     
     return business
@@ -121,13 +149,21 @@ def require_feature(feature: str):
 async def get_cashier_user(
     current_user: User = Depends(get_current_user),
 ) -> User:
+    """Allow staff roles that can operate the POS."""
+    return await get_pos_user(current_user)
+
+
+async def get_pos_user(
+    current_user: User = Depends(get_current_user),
+) -> User:
     """
-    Get the cashier user for POS operations.
+    Require a role that can create POS sales.
+    Owners/admins can also sell at the counter.
     """
-    if current_user.role != "CASHIER":
+    if current_user.role not in {"OWNER", "ADMIN", "MANAGER", "CASHIER"}:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only cashiers can access the POS",
+            detail="You do not have permission to use the POS",
         )
     return current_user
 

@@ -21,6 +21,11 @@ export const sales = {
   getReceipt: (id) => api.get(`/sales/${id}/receipt`),
 };
 
+export const payments = {
+  mpesaStkPush: (data) => api.post('/payments/mpesa/stk-push', data, { timeout: 45000 }),
+  mpesaStatus: (paymentId) => api.get(`/payments/mpesa/${paymentId}`, { timeout: 15000 }),
+};
+
 export const dashboard = {
   ownerOverview: () => api.get('/dashboard/owner/overview'),
   weeklySales: () => api.get('/dashboard/owner/weekly-sales'),

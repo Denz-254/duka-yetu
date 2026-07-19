@@ -7,10 +7,13 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 
 from app.core.config import settings
-from app.core.database import init_db, engine
-from app.api import auth, products, sales, dashboard, upload, subscription, resources
+from app.core.database import init_db, engine, SessionLocal
+from app.api import auth, products, sales, dashboard, upload, subscription, resources, payments, admin, marketplace, orders
+from app.core.bootstrap import ensure_super_admin
 from app.core.dependencies import require_feature
 from app.domains.users.routes import router as users_router
+from app.models.mpesa_transaction import MpesaTransaction  # noqa: F401 — register model
+from app.models.online_order import Notification, OnlineOrder  # noqa: F401 — register model
 
 # Use lifespan instead of on_event (modern FastAPI)
 @asynccontextmanager
@@ -24,12 +27,23 @@ async def lifespan(app: FastAPI):
     # Initialize database
     init_db()
     print("✅ Database initialized")
+
+    db = SessionLocal()
+    try:
+        ensure_super_admin(db)
+    finally:
+        db.close()
     
     # Check Cloudinary configuration
     if settings.CLOUDINARY_CLOUD_NAME:
         print(f"☁️ Cloudinary configured: {settings.CLOUDINARY_CLOUD_NAME}")
     else:
         print("⚠️ Cloudinary not configured - uploads disabled")
+
+    if settings.MPESA_ENVIRONMENT == "sandbox":
+        print("📱 M-Pesa mode: sandbox")
+    else:
+        print("📱 M-Pesa mode: production")
     
     yield  # Application runs here
     
@@ -102,6 +116,15 @@ app.include_router(
     tags=["Subscription"],
 )
 app.include_router(resources.router, prefix="/api/v1", tags=["Business Resources"])
+app.include_router(payments.router, prefix="/api/v1/payments", tags=["Payments"])
+app.include_router(admin.router, prefix="/api/v1/admin", tags=["Super Admin"])
+app.include_router(marketplace.router, prefix="/api/v1/marketplace", tags=["Marketplace"])
+app.include_router(
+    orders.router,
+    prefix="/api/v1/orders",
+    tags=["Online Orders"],
+    dependencies=[Depends(require_feature("pos"))],
+)
 
 @app.get("/")
 async def root():

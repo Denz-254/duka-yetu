@@ -13,7 +13,8 @@ class User(Base):
     __tablename__ = "users"
     
     id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    business_id = Column(Uuid(as_uuid=True), ForeignKey("businesses.id"), nullable=False)
+    # Nullable for SUPER_ADMIN (platform owner, not tied to a store)
+    business_id = Column(Uuid(as_uuid=True), ForeignKey("businesses.id"), nullable=True, index=True)
     name = Column(String(255), nullable=False)
     email = Column(String(255), nullable=False, index=True)
     phone = Column(String(20))

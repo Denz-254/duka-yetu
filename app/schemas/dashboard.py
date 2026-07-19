@@ -53,9 +53,12 @@ class RecentSale(BaseModel):
     sale_date: datetime
 
 class CashierDashboardResponse(BaseModel):
-    """Cashier dashboard response."""
+    """Cashier dashboard response — daily personal stats only."""
     today_sales_count: int
     today_revenue: Decimal
     recent_sales: List[RecentSale]
-    total_sales_all_time: int
-    total_revenue_all_time: Decimal
+    today_cash_count: int = 0
+    today_mpesa_count: int = 0
+    # Deprecated fields kept optional for older clients
+    total_sales_all_time: Optional[int] = None
+    total_revenue_all_time: Optional[Decimal] = None

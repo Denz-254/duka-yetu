@@ -43,8 +43,15 @@ async def create_sale(
     """
     Create a new sale (POS transaction).
     
-    Only CASHIER and above can create sales.
+    Only POS roles can create sales.
+    M-Pesa sales must go through /payments/mpesa/stk-push.
     """
+    if sale_data.payment_method == "MPESA":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Use M-Pesa STK Push checkout for mobile money payments.",
+        )
+
     # Validate products and calculate total
     items_data = []
     total_amount = Decimal('0.00')

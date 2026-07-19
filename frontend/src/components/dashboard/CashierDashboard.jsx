@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { FaShoppingCart, FaMoneyBillWave, FaClock, FaReceipt } from 'react-icons/fa';
+import { FaShoppingCart, FaMoneyBillWave, FaReceipt, FaMobileAlt } from 'react-icons/fa';
 import api from '../../api/client';
 import { formatCurrency, formatDate } from '../../utils/helpers';
 
@@ -9,8 +9,8 @@ const CashierDashboard = () => {
     today_sales_count: 0,
     today_revenue: 0,
     recent_sales: [],
-    total_sales_all_time: 0,
-    total_revenue_all_time: 0,
+    today_mpesa_count: 0,
+    today_cash_count: 0,
   });
   const [loading, setLoading] = useState(true);
 
@@ -40,6 +40,11 @@ const CashierDashboard = () => {
 
   return (
     <div className="space-y-6">
+      <div>
+        <h2 className="text-lg font-bold text-gray-800">My Daily Sales</h2>
+        <p className="text-sm text-gray-500">Today&apos;s performance only — not total business revenue</p>
+      </div>
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -48,7 +53,7 @@ const CashierDashboard = () => {
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">Today's Sales</p>
+              <p className="text-sm text-gray-500">Today&apos;s Sales</p>
               <p className="text-2xl font-bold text-gray-800 mt-1">
                 {stats.today_sales_count}
               </p>
@@ -67,7 +72,7 @@ const CashierDashboard = () => {
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">Today's Revenue</p>
+              <p className="text-sm text-gray-500">Today&apos;s Collections</p>
               <p className="text-2xl font-bold text-gray-800 mt-1">
                 {formatCurrency(stats.today_revenue)}
               </p>
@@ -86,9 +91,9 @@ const CashierDashboard = () => {
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">Total Sales</p>
+              <p className="text-sm text-gray-500">Cash Today</p>
               <p className="text-2xl font-bold text-gray-800 mt-1">
-                {stats.total_sales_all_time}
+                {stats.today_cash_count || 0}
               </p>
             </div>
             <div className="p-3 bg-purple-500 rounded-lg">
@@ -105,23 +110,23 @@ const CashierDashboard = () => {
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">Total Revenue</p>
+              <p className="text-sm text-gray-500">M-Pesa Today</p>
               <p className="text-2xl font-bold text-gray-800 mt-1">
-                {formatCurrency(stats.total_revenue_all_time)}
+                {stats.today_mpesa_count || 0}
               </p>
             </div>
-            <div className="p-3 bg-orange-500 rounded-lg">
-              <FaClock className="text-white text-xl" />
+            <div className="p-3 bg-emerald-500 rounded-lg">
+              <FaMobileAlt className="text-white text-xl" />
             </div>
           </div>
         </motion.div>
       </div>
 
       <div className="card">
-        <h2 className="text-lg font-bold text-gray-800 mb-4">Recent Sales</h2>
-        {stats.recent_sales.length === 0 ? (
+        <h2 className="text-lg font-bold text-gray-800 mb-4">Today&apos;s Recent Sales</h2>
+        {(stats.recent_sales || []).length === 0 ? (
           <div className="text-center py-8 text-gray-400">
-            No recent sales
+            No sales yet today
           </div>
         ) : (
           <div className="space-y-2">

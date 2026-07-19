@@ -38,9 +38,9 @@ async def register(
     Register a new business and owner account.
     
     Creates:
-    - Business profile
+    - Business profile (PENDING approval)
     - Owner user account
-    - JWT token for immediate access
+    - JWT token (limited until approved)
     """
     # Check if business email already exists
     existing_business = db.query(Business).filter(
@@ -62,7 +62,7 @@ async def register(
             detail="Username already taken"
         )
     
-    # Create business
+    # Create business — must be approved by super admin before POS use
     business = Business(
         name=request.business_name,
         owner_name=request.owner_name,
@@ -73,6 +73,7 @@ async def register(
         subscription_status="TRIALING",
         trial_ends_at=datetime.utcnow() + timedelta(days=14),
         is_active=True,
+        approval_status="PENDING",
     )
     db.add(business)
     db.flush()  # Get business ID without committing
@@ -121,6 +122,7 @@ async def register(
             email=business.email,
             package=business.package,
             is_active=business.is_active,
+            approval_status=business.approval_status,
             created_at=business.created_at,
         ),
         token=TokenResponse(
@@ -128,6 +130,7 @@ async def register(
             token_type="bearer",
             expires_in=1440,  # 24 hours in minutes
         ),
+        message="Registration received. A platform admin must approve your business before you can use POS features.",
     )
 
 @router.post("/login", response_model=AuthResponse)
@@ -163,6 +166,34 @@ async def login(
     db.commit()
     db.refresh(user)
     
+    # Super admin has no store business
+    if user.role == "SUPER_ADMIN":
+        token_data = {
+            "sub": str(user.id),
+            "business_id": None,
+            "role": user.role,
+            "username": user.username,
+        }
+        access_token = create_access_token(token_data)
+        return AuthResponse(
+            user=UserResponse(
+                id=str(user.id),
+                name=user.name,
+                email=user.email,
+                phone=user.phone,
+                username=user.username,
+                role=user.role,
+                business_id=None,
+            ),
+            business=None,
+            token=TokenResponse(
+                access_token=access_token,
+                token_type="bearer",
+                expires_in=1440,
+            ),
+            message="Welcome, platform admin",
+        )
+
     # Get business
     business = db.query(Business).filter(Business.id == user.business_id).first()
     if not business:
@@ -175,6 +206,14 @@ async def login(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="This business account is disabled.",
         )
+
+    approval = business.approval_status or "PENDING"
+    if approval == "REJECTED":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=business.rejection_reason
+            or "Your business registration was rejected. Contact support.",
+        )
     
     # Create JWT token
     token_data = {
@@ -184,6 +223,10 @@ async def login(
         "username": user.username,
     }
     access_token = create_access_token(token_data)
+
+    message = None
+    if approval == "PENDING":
+        message = "Your business is awaiting platform approval. POS features stay locked until approved."
     
     return AuthResponse(
         user=UserResponse(
@@ -203,6 +246,7 @@ async def login(
             email=business.email,
             package=business.package,
             is_active=business.is_active,
+            approval_status=approval,
             created_at=business.created_at,
         ),
         token=TokenResponse(
@@ -210,6 +254,7 @@ async def login(
             token_type="bearer",
             expires_in=1440,
         ),
+        message=message,
     )
 
 

@@ -16,6 +16,16 @@ const LoginPage = () => {
     e.preventDefault();
     const result = await login(username, password);
     if (result.success) {
+      if (result.user?.role === 'SUPER_ADMIN') {
+        toast.success(result.message || 'Welcome, Super Admin');
+        navigate('/admin');
+        return;
+      }
+      if (result.business?.approval_status && result.business.approval_status !== 'APPROVED') {
+        toast(result.message || 'Awaiting platform approval', { icon: '⏳' });
+        navigate('/pending-approval');
+        return;
+      }
       toast.success('Welcome back!');
       navigate('/dashboard');
     } else {
