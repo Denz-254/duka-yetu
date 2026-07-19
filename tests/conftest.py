@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from typing import Generator
+import uuid
 
 # Add the app directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -14,17 +15,20 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from app.main import app
 from app.core.database import Base, get_db
 from app.core.config import settings
+from app.models.business import Business
+from app.models.user import User
+from app.models.product import Product
+from app.core.security import get_password_hash
 
-# Test database URL - use in-memory SQLite for tests
+# Test database URL - use SQLite for faster tests
 TEST_DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "sqlite:///./test.db"  # Use SQLite for testing
+    "TEST_DATABASE_URL",
+    "sqlite:///./test.db"
 )
 
 @pytest.fixture(scope="session")
 def test_engine():
     """Create test database engine."""
-    # Use SQLite for testing
     engine = create_engine(
         TEST_DATABASE_URL,
         connect_args={"check_same_thread": False} if "sqlite" in TEST_DATABASE_URL else {}
@@ -39,6 +43,7 @@ def test_session(test_engine) -> Generator[Session, None, None]:
     TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
     session = TestingSessionLocal()
     yield session
+    session.rollback()
     session.close()
 
 @pytest.fixture
@@ -81,3 +86,75 @@ def test_product_data():
         "cost_price": 800.00,
         "stock_quantity": 50,
     }
+
+@pytest.fixture
+def test_business_data(test_session):
+    """Create a test business and return its data."""
+    business_id = str(uuid.uuid4())
+    business = Business(
+        id=business_id,
+        name="Test Business",
+        owner_name="Test Owner",
+        email="business@test.com",
+        phone="0712345678",
+        password_hash=get_password_hash("testpass123"),
+        package="BASIC",
+    )
+    test_session.add(business)
+    test_session.commit()
+    
+    return {
+        "id": business_id,
+        "name": business.name,
+        "email": business.email,
+    }
+
+@pytest.fixture
+def test_user(test_session, test_business_data):
+    """Create a test user."""
+    user = User(
+        id=str(uuid.uuid4()),
+        business_id=test_business_data["id"],
+        name="Test Cashier",
+        email="cashier@test.com",
+        phone="0712345678",
+        password_hash=get_password_hash("testpass123"),
+        role="CASHIER",
+        is_active=True,
+    )
+    test_session.add(user)
+    test_session.commit()
+    return user
+
+@pytest.fixture
+def test_owner(test_session, test_business_data):
+    """Create a test owner."""
+    owner = User(
+        id=str(uuid.uuid4()),
+        business_id=test_business_data["id"],
+        name="Test Owner",
+        email="owner@test.com",
+        phone="0712345678",
+        password_hash=get_password_hash("testpass123"),
+        role="OWNER",
+        is_active=True,
+    )
+    test_session.add(owner)
+    test_session.commit()
+    return owner
+
+@pytest.fixture
+def test_product(test_session, test_business_data):
+    """Create a test product."""
+    product = Product(
+        id=str(uuid.uuid4()),
+        business_id=test_business_data["id"],
+        name="Test Product",
+        sku="TP001",
+        selling_price=1000.00,
+        cost_price=800.00,
+        stock_quantity=50,
+    )
+    test_session.add(product)
+    test_session.commit()
+    return product
