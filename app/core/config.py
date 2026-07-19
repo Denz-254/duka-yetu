@@ -1,71 +1,52 @@
 """Application configuration management."""
 
-import os
-from typing import Optional, List
+from typing import Optional
 from pydantic_settings import BaseSettings
-from pydantic import Field, field_validator
+from pydantic import ConfigDict, Field
 
 class Settings(BaseSettings):
     """Application settings."""
-    
+
     # Application
     APP_NAME: str = "Duka Yetu POS"
     APP_VERSION: str = "1.0.0"
-    ENVIRONMENT: str = Field(default="development", env="ENVIRONMENT")
-    DEBUG: bool = Field(default=True, env="DEBUG")
-    
+    ENVIRONMENT: str = Field(default="development")
+    DEBUG: bool = Field(default=True)
+
     # Database
     DATABASE_URL: str = Field(
-        default="postgresql://postgres:postgres@localhost:5432/duka_yetu",
-        env="DATABASE_URL"
+        default="postgresql://postgres:postgres@localhost:5432/duka_yetu"
     )
-    DATABASE_POOL_SIZE: int = Field(default=10, env="DATABASE_POOL_SIZE")
-    DATABASE_MAX_OVERFLOW: int = Field(default=20, env="DATABASE_MAX_OVERFLOW")
-    
+    DATABASE_POOL_SIZE: int = Field(default=10)
+    DATABASE_MAX_OVERFLOW: int = Field(default=20)
+
     # Security
     JWT_SECRET_KEY: str = Field(
-        default="your-secret-key-change-in-production",
-        env="JWT_SECRET_KEY"
+        default="your-secret-key-change-in-production"
     )
     JWT_ALGORITHM: str = "HS256"
-    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(
-        default=1440,
-        env="JWT_ACCESS_TOKEN_EXPIRE_MINUTES"
-    )
-    
-    BCRYPT_ROUNDS: int = Field(default=12, env="BCRYPT_ROUNDS")
-    
-    # CORS - Simple string that we'll parse
-    CORS_ORIGINS: str = Field(
-        default="*",
-        env="CORS_ORIGINS"
-    )
-    
-    def get_cors_origins(self) -> List[str]:
-        """Get CORS origins as a list."""
-        if self.CORS_ORIGINS == "*":
-            return ["*"]
-        return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
-    
-    # Cloudinary
-    CLOUDINARY_CLOUD_NAME: str = Field(
-        default="your_cloud_name",
-        env="CLOUDINARY_CLOUD_NAME"
-    )
-    CLOUDINARY_API_KEY: str = Field(
-        default="your_api_key",
-        env="CLOUDINARY_API_KEY"
-    )
-    CLOUDINARY_API_SECRET: str = Field(
-        default="your_api_secret",
-        env="CLOUDINARY_API_SECRET"
-    )
-    
-    LOW_STOCK_THRESHOLD: int = Field(default=10, env="LOW_STOCK_THRESHOLD")
-    FRONTEND_URL: str = Field(default="http://localhost:5173", env="FRONTEND_URL")
-    
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=1440)
 
+    # Security - Password hashing
+    BCRYPT_ROUNDS: int = Field(default=12)
+
+    # CORS
+    CORS_ORIGINS: list[str] = Field(
+        default=["http://localhost:3000", "http://localhost:5173"]
+    )
+
+    # Business rules
+    LOW_STOCK_THRESHOLD: int = Field(default=10)
+
+    # Frontend URL
+    FRONTEND_URL: str = Field(default="http://localhost:5173")
+
+    # Use ConfigDict instead of class Config
+    model_config = ConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra="ignore",
+    )
+
+# Create global settings instance
 settings = Settings()
