@@ -63,9 +63,11 @@ app = FastAPI(
 )
 
 # ✅ CORS middleware - MUST be FIRST
+# Codespaces origins change per machine; regex covers *.app.github.dev / *.github.dev
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS if hasattr(settings, 'CORS_ORIGINS') else ["*"],
+    allow_origin_regex=r"https://.*\.(app\.)?github\.dev",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

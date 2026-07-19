@@ -1,13 +1,40 @@
 import axios from 'axios';
 
-// Get the correct API URL for Codespace
+/**
+ * Resolve API base URL.
+ * In Vite DEV (including Codespaces), use same-origin `/api/v1` so the Vite
+ * proxy forwards to the backend — avoids CORS + github.dev → app.github.dev redirects.
+ */
 const getApiUrl = () => {
-  // Check if running in Codespace
-  if (import.meta.env.VITE_CODESPACE_NAME) {
-    return `https://${import.meta.env.VITE_CODESPACE_NAME}-8001.${import.meta.env.VITE_GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN}/api/v1`;
+  // Same-origin via Vite proxy in DEV (localhost + Codespaces).
+  // Do this first so a stale VITE_API_URL pointing at *.github.dev cannot break CORS.
+  if (import.meta.env.DEV) {
+    return '/api/v1';
   }
-  // Fallback to environment variable or localhost
-  return import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1';
+
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL.replace(/\/$/, '');
+  }
+
+  // Browser on Codespaces production preview: mirror the frontend forwarded hostname
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    const match = host.match(/^(.*?)-(\d+)\.(.+)$/);
+    if (match) {
+      const [, name, , domain] = match;
+      const normalized = domain === 'github.dev' ? 'app.github.dev' : domain;
+      return `https://${name}-8001.${normalized}/api/v1`;
+    }
+  }
+
+  if (import.meta.env.VITE_CODESPACE_NAME) {
+    const rawDomain =
+      import.meta.env.VITE_GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN || 'app.github.dev';
+    const domain = rawDomain === 'github.dev' ? 'app.github.dev' : rawDomain;
+    return `https://${import.meta.env.VITE_CODESPACE_NAME}-8001.${domain}/api/v1`;
+  }
+
+  return 'http://localhost:8001/api/v1';
 };
 
 const API_BASE = getApiUrl();
