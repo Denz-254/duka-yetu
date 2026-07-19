@@ -213,6 +213,8 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           file: ./frontend/Dockerfile
+          build-args: |
+            VITE_API_URL=/api/v1
           platforms: linux/amd64
           provenance: false
           sbom: false

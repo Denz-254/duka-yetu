@@ -24,8 +24,8 @@ RUN apk add --no-cache wget
 # Copy built assets from builder
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Copy nginx configuration if it exists, otherwise use default
-COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
+# Context is ./frontend, so nginx.conf is at the build-context root.
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Expose port
 EXPOSE 80
