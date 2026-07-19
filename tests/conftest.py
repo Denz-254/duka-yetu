@@ -20,10 +20,12 @@ from app.models.user import User
 from app.models.product import Product
 from app.core.security import get_password_hash
 
-# Test database URL - use SQLite for faster tests
-TEST_DATABASE_URL = os.getenv(
-    "TEST_DATABASE_URL",
-    "sqlite:///./test.db"
+# Use the explicit test database first, then the CI/application database.
+# SQLite remains a portable local fallback because models use SQLAlchemy Uuid.
+TEST_DATABASE_URL = (
+    os.getenv("TEST_DATABASE_URL")
+    or os.getenv("DATABASE_URL")
+    or "sqlite:///./test.db"
 )
 
 @pytest.fixture(scope="session")
@@ -70,6 +72,7 @@ def test_user_data():
     return {
         "business_name": "Test Business",
         "owner_name": "Test Owner",
+        "username": "test_owner",
         "email": "test@example.com",
         "phone": "0712345678",
         "password": "StrongPass123!",
@@ -91,11 +94,12 @@ def test_product_data():
 def test_business_data(test_session):
     """Create a test business and return its data."""
     business_id = uuid.uuid4()
+    unique_suffix = uuid.uuid4().hex[:8]
     business = Business(
         id=business_id,
-        name="Test Business",
+        name=f"Test Business {unique_suffix}",
         owner_name="Test Owner",
-        email="business@test.com",
+        email=f"business_{unique_suffix}@test.com",
         phone="0712345678",
         password_hash=get_password_hash("testpass123"),
         package="BASIC",

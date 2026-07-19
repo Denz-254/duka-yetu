@@ -2,8 +2,7 @@
 
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, DateTime, Boolean, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, String, DateTime, Boolean, ForeignKey, Uuid
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
@@ -13,8 +12,8 @@ class User(Base):
     
     __tablename__ = "users"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    business_id = Column(UUID(as_uuid=True), ForeignKey("businesses.id"), nullable=False)
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    business_id = Column(Uuid(as_uuid=True), ForeignKey("businesses.id"), nullable=False)
     name = Column(String(255), nullable=False)
     email = Column(String(255), nullable=False, index=True)
     phone = Column(String(20))
@@ -26,7 +25,7 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     # branch_id - for multi-branch support (optional)
-    branch_id = Column(UUID(as_uuid=True), nullable=True)
+    branch_id = Column(Uuid(as_uuid=True), nullable=True)
     
     # Relationships
     business = relationship("Business", back_populates="users")

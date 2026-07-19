@@ -2,8 +2,7 @@
 
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, DateTime, Boolean, JSON
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, String, DateTime, Boolean, JSON, Uuid
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
@@ -13,7 +12,7 @@ class Business(Base):
     
     __tablename__ = "businesses"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String(255), nullable=False)
     owner_name = Column(String(255), nullable=False)
     phone = Column(String(20), nullable=False)

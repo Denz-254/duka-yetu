@@ -2,8 +2,7 @@
 
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, DateTime, ForeignKey, Integer, Numeric, Enum
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, String, DateTime, ForeignKey, Numeric, Uuid
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
@@ -13,9 +12,9 @@ class Sale(Base):
     
     __tablename__ = "sales"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    business_id = Column(UUID(as_uuid=True), ForeignKey("businesses.id"), nullable=False)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    business_id = Column(Uuid(as_uuid=True), ForeignKey("businesses.id"), nullable=False)
+    user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
     receipt_number = Column(String(50), nullable=False, unique=True, index=True)
     total_amount = Column(Numeric(10, 2), nullable=False)
     payment_method = Column(String(50), default="CASH", nullable=False)

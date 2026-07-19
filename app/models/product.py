@@ -2,8 +2,7 @@
 
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, DateTime, ForeignKey, Integer, Numeric, Boolean
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, String, DateTime, ForeignKey, Integer, Numeric, Boolean, Uuid
 from sqlalchemy.orm import relationship
 from sqlalchemy import UniqueConstraint
 
@@ -14,8 +13,8 @@ class Product(Base):
     
     __tablename__ = "products"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    business_id = Column(UUID(as_uuid=True), ForeignKey("businesses.id"), nullable=False)
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    business_id = Column(Uuid(as_uuid=True), ForeignKey("businesses.id"), nullable=False)
     name = Column(String(255), nullable=False)
     sku = Column(String(100), nullable=False)
     selling_price = Column(Numeric(10, 2), nullable=False)
