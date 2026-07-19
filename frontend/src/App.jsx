@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import useAuthStore from './store/authStore';
+import useSubscriptionStore from './store/subscriptionStore';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import LandingPage from './pages/LandingPage';
@@ -26,6 +27,16 @@ import './App.css';
 const ProtectedRoute = ({ children }) => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   return isAuthenticated ? children : <Navigate to="/login" />;
+};
+
+const FeatureRoute = ({ feature, children }) => {
+  const loaded = useSubscriptionStore((state) => state.loaded);
+  const active = useSubscriptionStore((state) => state.active);
+  const features = useSubscriptionStore((state) => state.features);
+  if (!loaded) return <div className="p-8 text-center text-gray-500">Checking your plan...</div>;
+  return active && features.includes(feature)
+    ? children
+    : <Navigate to="/settings/subscription" replace />;
 };
 
 function App() {
@@ -57,26 +68,26 @@ function App() {
           }
         >
           {/* Main Pages */}
-          <Route path="dashboard" element={<DashboardPage />} />
-          <Route path="pos" element={<POSPage />} />
-          <Route path="products" element={<ProductsPage />} />
-          <Route path="staff" element={<StaffPage />} />
-          <Route path="reports" element={<ReportsPage />} />
-          <Route path="customers" element={<CustomersPage />} />
-          <Route path="branches" element={<BranchesPage />} />
+          <Route path="dashboard" element={<FeatureRoute feature="basic_reports"><DashboardPage /></FeatureRoute>} />
+          <Route path="pos" element={<FeatureRoute feature="pos"><POSPage /></FeatureRoute>} />
+          <Route path="products" element={<FeatureRoute feature="products"><ProductsPage /></FeatureRoute>} />
+          <Route path="staff" element={<FeatureRoute feature="business_settings"><StaffPage /></FeatureRoute>} />
+          <Route path="reports" element={<FeatureRoute feature="basic_reports"><ReportsPage /></FeatureRoute>} />
+          <Route path="customers" element={<FeatureRoute feature="customers"><CustomersPage /></FeatureRoute>} />
+          <Route path="branches" element={<FeatureRoute feature="business_settings"><BranchesPage /></FeatureRoute>} />
 
           {/* Inventory Pages */}
-          <Route path="categories" element={<CategoriesPage />} />
-          <Route path="stock-management" element={<StockManagementPage />} />
-          <Route path="suppliers" element={<SuppliersPage />} />
+          <Route path="categories" element={<FeatureRoute feature="inventory"><CategoriesPage /></FeatureRoute>} />
+          <Route path="stock-management" element={<FeatureRoute feature="inventory"><StockManagementPage /></FeatureRoute>} />
+          <Route path="suppliers" element={<FeatureRoute feature="suppliers"><SuppliersPage /></FeatureRoute>} />
 
           {/* Settings Pages */}
-          <Route path="settings/profile" element={<BusinessProfilePage />} />
-          <Route path="settings/payment" element={<PaymentSettingsPage />} />
-          <Route path="settings/receipt" element={<ReceiptSettingsPage />} />
-          <Route path="settings/tax" element={<TaxSettingsPage />} />
+          <Route path="settings/profile" element={<FeatureRoute feature="business_settings"><BusinessProfilePage /></FeatureRoute>} />
+          <Route path="settings/payment" element={<FeatureRoute feature="business_settings"><PaymentSettingsPage /></FeatureRoute>} />
+          <Route path="settings/receipt" element={<FeatureRoute feature="business_settings"><ReceiptSettingsPage /></FeatureRoute>} />
+          <Route path="settings/tax" element={<FeatureRoute feature="business_settings"><TaxSettingsPage /></FeatureRoute>} />
           <Route path="settings/subscription" element={<SubscriptionPage />} />
-          <Route path="settings/security" element={<SecuritySettingsPage />} />
+          <Route path="settings/security" element={<FeatureRoute feature="business_settings"><SecuritySettingsPage /></FeatureRoute>} />
         </Route>
       </Routes>
     </Router>

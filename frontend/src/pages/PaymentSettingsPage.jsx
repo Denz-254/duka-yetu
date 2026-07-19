@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { FaCreditCard, FaMobileAlt, FaMoneyBillWave, FaPaypal, FaToggleOn, FaToggleOff, FaSave } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
+import { business } from '../api/endpoints';
 
 const PaymentSettingsPage = () => {
   const [settings, setSettings] = useState({
@@ -10,7 +11,6 @@ const PaymentSettingsPage = () => {
     card_enabled: true,
     bank_enabled: false,
     mpesa_shortcode: '174379',
-    mpesa_passkey: 'your_passkey_here',
     card_processor: 'stripe',
     stripe_publishable_key: '',
     stripe_secret_key: '',
@@ -18,13 +18,28 @@ const PaymentSettingsPage = () => {
     tax_rate: 16,
   });
 
+  useEffect(() => {
+    business.getSettings('payment')
+      .then(({ data }) => setSettings((current) => ({ ...current, ...data })))
+      .catch(() => toast.error('Failed to load payment settings'));
+  }, []);
+
   const handleToggle = (key) => {
     setSettings({ ...settings, [key]: !settings[key] });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    toast.success('Payment settings saved successfully');
+    try {
+      // Secrets must be configured on the backend; never persist gateway secret keys from the browser.
+      const safeSettings = { ...settings };
+      delete safeSettings.stripe_secret_key;
+      delete safeSettings.mpesa_passkey;
+      await business.updateSettings('payment', safeSettings);
+      toast.success('Payment settings saved successfully');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to save payment settings');
+    }
   };
 
   return (
@@ -125,15 +140,9 @@ const PaymentSettingsPage = () => {
                     className="input-primary bg-white text-gray-800"
                   />
                 </div>
-                <div>
-                  <label className="label-primary">Passkey</label>
-                  <input
-                    type="password"
-                    value={settings.mpesa_passkey}
-                    onChange={(e) => setSettings({ ...settings, mpesa_passkey: e.target.value })}
-                    className="input-primary bg-white text-gray-800"
-                  />
-                </div>
+                <p className="text-xs text-gray-500 self-end pb-3">
+                  Configure the M-Pesa passkey only in the backend environment.
+                </p>
               </div>
             </div>
           )}
@@ -163,15 +172,9 @@ const PaymentSettingsPage = () => {
                     className="input-primary bg-white text-gray-800"
                   />
                 </div>
-                <div className="md:col-span-2">
-                  <label className="label-primary">Secret Key</label>
-                  <input
-                    type="password"
-                    value={settings.stripe_secret_key}
-                    onChange={(e) => setSettings({ ...settings, stripe_secret_key: e.target.value })}
-                    className="input-primary bg-white text-gray-800"
-                  />
-                </div>
+                <p className="md:col-span-2 text-xs text-gray-500">
+                  Configure Stripe secret keys only in the backend environment; they are never stored in this browser form.
+                </p>
               </div>
             </div>
           )}

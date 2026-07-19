@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
@@ -17,12 +16,13 @@ import {
   FaQuoteLeft,
   FaCrown,
   FaRocket,
-  FaGem
+  FaGem,
+  FaBolt,
+  FaHeadset,
+  FaGlobeAfrica
 } from 'react-icons/fa';
 
 const LandingPage = () => {
-  const [selectedPlan, setSelectedPlan] = useState('basic');
-
   const features = [
     { icon: FaShoppingCart, title: 'POS System', description: 'Fast and intuitive point of sale for your business' },
     { icon: FaBox, title: 'Inventory Management', description: 'Track stock levels and get low stock alerts' },
@@ -107,6 +107,31 @@ const LandingPage = () => {
 
   return (
     <div className="min-h-screen bg-white">
+      <header className="sticky top-0 z-50 border-b border-primary-100/80 bg-white/90 backdrop-blur-xl">
+        <div className="container mx-auto flex h-18 items-center justify-between px-4">
+          <Link to="/" className="flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-600 shadow-lg shadow-primary-600/20">
+              <FaStore className="text-white" />
+            </span>
+            <span className="text-xl font-extrabold tracking-tight text-primary-900">Duka Yetu</span>
+          </Link>
+          <nav className="hidden items-center gap-8 text-sm font-semibold text-gray-600 md:flex">
+            <a href="#features" className="hover:text-primary-700">Features</a>
+            <a href="#how-it-works" className="hover:text-primary-700">How it works</a>
+            <a href="#pricing" className="hover:text-primary-700">Pricing</a>
+            <a href="#stories" className="hover:text-primary-700">Customers</a>
+          </nav>
+          <div className="flex items-center gap-3">
+            <Link to="/login" className="hidden px-3 py-2 text-sm font-semibold text-gray-700 hover:text-primary-700 sm:block">
+              Sign in
+            </Link>
+            <Link to="/register" className="btn-primary text-sm font-semibold">
+              Start free
+            </Link>
+          </div>
+        </div>
+      </header>
+
       {/* Hero Section */}
       <section className="relative overflow-hidden bg-gradient-to-br from-primary-50 to-white">
         <div className="absolute inset-0 bg-grid-primary/5 bg-[size:40px_40px]" />
@@ -245,8 +270,24 @@ const LandingPage = () => {
         </div>
       </section>
 
+      <section className="border-y border-primary-100 bg-primary-900 py-8 text-white">
+        <div className="container mx-auto grid grid-cols-2 gap-6 px-4 text-center md:grid-cols-4">
+          {[
+            ['1,000+', 'Businesses'],
+            ['99.9%', 'Platform uptime'],
+            ['40%', 'Faster checkout'],
+            ['24/7', 'Business visibility'],
+          ].map(([value, label]) => (
+            <div key={label}>
+              <p className="text-2xl font-extrabold md:text-3xl">{value}</p>
+              <p className="mt-1 text-xs font-medium text-primary-200 md:text-sm">{label}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* Features Section */}
-      <section className="py-16 bg-gray-50">
+      <section id="features" className="scroll-mt-20 py-20 bg-gray-50">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold text-gray-900">Everything You Need to Grow</h2>
@@ -278,8 +319,33 @@ const LandingPage = () => {
         </div>
       </section>
 
+      <section id="how-it-works" className="scroll-mt-20 py-20">
+        <div className="container mx-auto px-4">
+          <div className="mx-auto mb-12 max-w-2xl text-center">
+            <span className="text-sm font-bold uppercase tracking-widest text-primary-600">Simple by design</span>
+            <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-gray-900 md:text-4xl">Open your smarter shop in minutes</h2>
+          </div>
+          <div className="mx-auto grid max-w-5xl gap-6 md:grid-cols-3">
+            {[
+              { icon: FaStore, step: '01', title: 'Create your store', text: 'Add your business details, products, and team from one guided workspace.' },
+              { icon: FaBolt, step: '02', title: 'Start selling', text: 'Use the fast POS, accept your preferred payments, and issue clear receipts.' },
+              { icon: FaChartLine, step: '03', title: 'Grow with clarity', text: 'Track stock, revenue, staff, and branches with live business insights.' },
+            ].map(({ icon: Icon, step, title, text }) => (
+              <div key={step} className="relative rounded-2xl border border-primary-100 bg-primary-50/50 p-6">
+                <span className="absolute right-5 top-4 text-4xl font-black text-primary-100">{step}</span>
+                <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-primary-600 text-white">
+                  <Icon />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900">{title}</h3>
+                <p className="mt-2 text-sm leading-6 text-gray-600">{text}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Pricing Section */}
-      <section className="py-16">
+      <section id="pricing" className="scroll-mt-20 py-20 bg-primary-50/40">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold text-gray-900">Simple, Transparent Pricing</h2>
@@ -345,7 +411,7 @@ const LandingPage = () => {
       </section>
 
       {/* Testimonials Section */}
-      <section className="py-16 bg-gray-50">
+      <section id="stories" className="scroll-mt-20 py-20 bg-white">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold text-gray-900">What Our Customers Say</h2>
@@ -385,6 +451,24 @@ const LandingPage = () => {
         </div>
       </section>
 
+      <section className="border-y border-primary-100 bg-gray-50 py-12">
+        <div className="container mx-auto grid gap-6 px-4 md:grid-cols-3">
+          {[
+            { icon: FaShieldAlt, title: 'Your data stays protected', text: 'Tenant-isolated records and role-based access keep each business secure.' },
+            { icon: FaHeadset, title: 'Support when it matters', text: 'Get practical help from a team that understands growing Kenyan businesses.' },
+            { icon: FaGlobeAfrica, title: 'Built for local commerce', text: 'KES pricing, familiar workflows, and support for the ways your customers pay.' },
+          ].map(({ icon: Icon, title, text }) => (
+            <div key={title} className="flex gap-4">
+              <Icon className="mt-1 shrink-0 text-xl text-primary-600" />
+              <div>
+                <h3 className="font-bold text-gray-900">{title}</h3>
+                <p className="mt-1 text-sm leading-6 text-gray-600">{text}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* CTA Section */}
       <section className="py-16 bg-primary-600">
         <div className="container mx-auto px-4 text-center">
@@ -406,6 +490,20 @@ const LandingPage = () => {
           </p>
         </div>
       </section>
+      <footer className="bg-primary-900 px-4 py-10 text-primary-100">
+        <div className="container mx-auto flex flex-col items-center justify-between gap-5 md:flex-row">
+          <div className="flex items-center gap-3">
+            <FaStore className="text-primary-400" />
+            <span className="font-bold text-white">Duka Yetu</span>
+            <span className="text-sm text-primary-300">Built for businesses that are going places.</span>
+          </div>
+          <div className="flex gap-6 text-sm">
+            <a href="#features" className="hover:text-white">Features</a>
+            <a href="#pricing" className="hover:text-white">Pricing</a>
+            <Link to="/login" className="hover:text-white">Sign in</Link>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 };

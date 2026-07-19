@@ -90,7 +90,7 @@ def test_product_data():
 @pytest.fixture
 def test_business_data(test_session):
     """Create a test business and return its data."""
-    business_id = str(uuid.uuid4())
+    business_id = uuid.uuid4()
     business = Business(
         id=business_id,
         name="Test Business",
@@ -104,7 +104,7 @@ def test_business_data(test_session):
     test_session.commit()
     
     return {
-        "id": business_id,
+        "id": str(business_id),
         "name": business.name,
         "email": business.email,
     }
@@ -113,10 +113,11 @@ def test_business_data(test_session):
 def test_user(test_session, test_business_data):
     """Create a test user."""
     user = User(
-        id=str(uuid.uuid4()),
-        business_id=test_business_data["id"],
+        id=uuid.uuid4(),
+        business_id=uuid.UUID(test_business_data["id"]),
         name="Test Cashier",
         email="cashier@test.com",
+        username=f"cashier_{uuid.uuid4().hex[:8]}",
         phone="0712345678",
         password_hash=get_password_hash("testpass123"),
         role="CASHIER",
@@ -130,10 +131,11 @@ def test_user(test_session, test_business_data):
 def test_owner(test_session, test_business_data):
     """Create a test owner."""
     owner = User(
-        id=str(uuid.uuid4()),
-        business_id=test_business_data["id"],
+        id=uuid.uuid4(),
+        business_id=uuid.UUID(test_business_data["id"]),
         name="Test Owner",
         email="owner@test.com",
+        username=f"owner_{uuid.uuid4().hex[:8]}",
         phone="0712345678",
         password_hash=get_password_hash("testpass123"),
         role="OWNER",
@@ -147,8 +149,8 @@ def test_owner(test_session, test_business_data):
 def test_product(test_session, test_business_data):
     """Create a test product."""
     product = Product(
-        id=str(uuid.uuid4()),
-        business_id=test_business_data["id"],
+        id=uuid.uuid4(),
+        business_id=uuid.UUID(test_business_data["id"]),
         name="Test Product",
         sku="TP001",
         selling_price=1000.00,

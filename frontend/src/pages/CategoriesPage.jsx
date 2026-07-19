@@ -5,7 +5,7 @@ import {
   FaBoxes, FaTimes, FaCheckCircle, FaCircle
 } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
-import api from '../api/client';
+import { categories as categoriesApi } from '../api/endpoints';
 
 const CategoriesPage = () => {
   const [categories, setCategories] = useState([]);
@@ -26,25 +26,8 @@ const CategoriesPage = () => {
   const fetchCategories = async () => {
     setLoading(true);
     try {
-      // Since we don't have a categories table yet, generate from products
-      const productsRes = await api.get('/products/', { params: { limit: 100 } });
-      const uniqueCategories = {};
-      if (productsRes.data && productsRes.data.items) {
-        productsRes.data.items.forEach(product => {
-          // Extract category from product name or use default
-          const category = product.category || 'Uncategorized';
-          if (!uniqueCategories[category]) {
-            uniqueCategories[category] = {
-              id: category.toLowerCase().replace(/\s+/g, '-'),
-              name: category,
-              count: 0,
-              color: `#${Math.floor(Math.random()*16777215).toString(16)}`,
-            };
-          }
-          uniqueCategories[category].count++;
-        });
-      }
-      setCategories(Object.values(uniqueCategories));
+      const response = await categoriesApi.getAll();
+      setCategories(response.data);
     } catch (error) {
       console.error('Failed to fetch categories:', error);
       toast.error('Failed to load categories');
@@ -57,10 +40,11 @@ const CategoriesPage = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      // In production, this would call a categories API endpoint
       if (editingCategory) {
+        await categoriesApi.update(editingCategory.id, formData);
         toast.success('Category updated successfully');
       } else {
+        await categoriesApi.create(formData);
         toast.success('Category created successfully');
       }
       setShowModal(false);
@@ -77,6 +61,7 @@ const CategoriesPage = () => {
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this category?')) {
       try {
+        await categoriesApi.delete(id);
         toast.success('Category deleted successfully');
         fetchCategories();
       } catch (error) {

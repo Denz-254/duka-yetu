@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { FaSearch, FaEdit, FaTrash, FaPlus, FaImage } from 'react-icons/fa';
+import { FaSearch, FaEdit, FaTrash, FaPlus, FaImage, FaTimes } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
 import useProductStore from '../../store/productStore';
 import useAuthStore from '../../store/authStore';

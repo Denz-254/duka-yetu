@@ -4,7 +4,7 @@ import {
   FaBarcode, FaSearch, FaPlus, FaMinus, FaEdit,
   FaTrash, FaExclamationTriangle, FaCheckCircle,
   FaClock, FaFilter, FaSort, FaDownload,
-  FaBox, FaWarehouse, FaTruck, FaClipboardList
+  FaBox, FaWarehouse, FaTruck, FaClipboardList, FaTimes
 } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
 import api from '../api/client';

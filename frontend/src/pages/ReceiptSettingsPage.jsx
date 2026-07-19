@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
   FaReceipt, FaPrint, FaFilePdf, FaEnvelope, 
@@ -7,6 +7,7 @@ import {
   FaInfoCircle, FaCheckCircle
 } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
+import { business } from '../api/endpoints';
 
 const ReceiptSettingsPage = () => {
   const [settings, setSettings] = useState({
@@ -68,29 +69,49 @@ const ReceiptSettingsPage = () => {
     is_default: false,
   });
 
+  useEffect(() => {
+    business.getSettings('receipt')
+      .then(({ data }) => setSettings((current) => ({ ...current, ...data })))
+      .catch(() => toast.error('Failed to load receipt settings'));
+  }, []);
+
   const handleToggle = (key) => {
     setSettings({ ...settings, [key]: !settings[key] });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    toast.success('Receipt settings saved successfully');
+    try {
+      await business.updateSettings('receipt', settings);
+      toast.success('Receipt settings saved successfully');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to save receipt settings');
+    }
   };
 
-  const handleTemplateSubmit = (e) => {
+  const handleTemplateSubmit = async (e) => {
     e.preventDefault();
-    if (editingTemplate) {
-      toast.success('Template updated successfully');
-    } else {
-      toast.success('Template created successfully');
+    const nextTemplate = { ...templateForm, id: editingTemplate?.id || crypto.randomUUID() };
+    let templates = editingTemplate
+      ? settings.templates.map((template) => template.id === editingTemplate.id ? nextTemplate : template)
+      : [...settings.templates, nextTemplate];
+    if (nextTemplate.is_default) {
+      templates = templates.map((template) => ({ ...template, is_default: template.id === nextTemplate.id }));
     }
+    const updated = { ...settings, templates };
+    setSettings(updated);
+    await business.updateSettings('receipt', updated);
+    toast.success(`Template ${editingTemplate ? 'updated' : 'created'} successfully`);
     setShowTemplateModal(false);
     setEditingTemplate(null);
     setTemplateForm({ name: '', type: 'standard', content: '', is_default: false });
   };
 
-  const handleDeleteTemplate = (id) => {
+  const handleDeleteTemplate = async (id) => {
     if (window.confirm('Are you sure you want to delete this template?')) {
+      const updated = { ...settings, templates: settings.templates.filter((template) => template.id !== id) };
+      setSettings(updated);
+      await business.updateSettings('receipt', updated);
       toast.success('Template deleted successfully');
     }
   };

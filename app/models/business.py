@@ -2,7 +2,7 @@
 
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, DateTime, Boolean, Integer
+from sqlalchemy import Column, String, DateTime, Boolean, JSON
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -20,6 +20,13 @@ class Business(Base):
     email = Column(String(255), nullable=False, unique=True, index=True)
     password_hash = Column(String(255), nullable=False)
     package = Column(String(50), default="BASIC", nullable=False)
+    subscription_status = Column(String(50), default="TRIALING", nullable=False)
+    stripe_customer_id = Column(String(255), unique=True, index=True)
+    stripe_subscription_id = Column(String(255), unique=True, index=True)
+    trial_ends_at = Column(DateTime)
+    subscription_current_period_end = Column(DateTime)
+    profile = Column(JSON, default=dict, nullable=False)
+    settings = Column(JSON, default=dict, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

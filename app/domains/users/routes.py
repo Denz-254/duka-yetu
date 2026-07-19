@@ -9,6 +9,7 @@ from uuid import UUID
 from app.core.database import get_db
 from app.core.dependencies import get_current_user, require_owner
 from app.core.security import get_password_hash
+from app.core.plans import plan_limit, subscription_is_active
 from app.models.user import User
 from app.models.business import Business
 from app.schemas.user import (
@@ -40,6 +41,23 @@ async def create_staff(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Business not found"
+        )
+
+    if not subscription_is_active(business):
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="Your subscription is not active.",
+        )
+
+    staff_limit = plan_limit(business, "staff")
+    current_staff = db.query(User).filter(
+        User.business_id == current_user.business_id,
+        User.is_active == True,
+    ).count()
+    if staff_limit is not None and current_staff >= staff_limit:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Your {business.package.title()} plan allows up to {staff_limit} staff accounts.",
         )
     
     # Check if username is taken

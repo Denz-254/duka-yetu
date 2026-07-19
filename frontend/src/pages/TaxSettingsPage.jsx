@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
   FaClipboardList, FaPlus, FaEdit, FaTrash, FaSave,
@@ -6,6 +6,7 @@ import {
   FaCheckCircle, FaTimes, FaCalendarAlt, FaCalculator
 } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
+import { business } from '../api/endpoints';
 
 const TaxSettingsPage = () => {
   const [settings, setSettings] = useState({
@@ -111,22 +112,39 @@ const TaxSettingsPage = () => {
     reason: '',
   });
 
+  useEffect(() => {
+    business.getSettings('tax')
+      .then(({ data }) => setSettings((current) => ({ ...current, ...data })))
+      .catch(() => toast.error('Failed to load tax settings'));
+  }, []);
+
+  const persistSettings = async (updated) => {
+    setSettings(updated);
+    await business.updateSettings('tax', updated);
+  };
+
   const handleToggle = (key) => {
     setSettings({ ...settings, [key]: !settings[key] });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    toast.success('Tax settings saved successfully');
+    try {
+      await business.updateSettings('tax', settings);
+      toast.success('Tax settings saved successfully');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to save tax settings');
+    }
   };
 
-  const handleTaxRateSubmit = (e) => {
+  const handleTaxRateSubmit = async (e) => {
     e.preventDefault();
-    if (editingTaxRate) {
-      toast.success('Tax rate updated successfully');
-    } else {
-      toast.success('Tax rate added successfully');
-    }
+    const record = { ...taxRateForm, id: editingTaxRate?.id || Date.now() };
+    const tax_rates = editingTaxRate
+      ? settings.tax_rates.map((item) => item.id === editingTaxRate.id ? record : item)
+      : [...settings.tax_rates, record];
+    await persistSettings({ ...settings, tax_rates });
+    toast.success(`Tax rate ${editingTaxRate ? 'updated' : 'added'} successfully`);
     setShowTaxRateModal(false);
     setEditingTaxRate(null);
     setTaxRateForm({
@@ -141,13 +159,14 @@ const TaxSettingsPage = () => {
     });
   };
 
-  const handleTaxRuleSubmit = (e) => {
+  const handleTaxRuleSubmit = async (e) => {
     e.preventDefault();
-    if (editingTaxRule) {
-      toast.success('Tax rule updated successfully');
-    } else {
-      toast.success('Tax rule added successfully');
-    }
+    const record = { ...taxRuleForm, id: editingTaxRule?.id || Date.now() };
+    const tax_rules = editingTaxRule
+      ? settings.tax_rules.map((item) => item.id === editingTaxRule.id ? record : item)
+      : [...settings.tax_rules, record];
+    await persistSettings({ ...settings, tax_rules });
+    toast.success(`Tax rule ${editingTaxRule ? 'updated' : 'added'} successfully`);
     setShowTaxRuleModal(false);
     setEditingTaxRule(null);
     setTaxRuleForm({
@@ -158,13 +177,14 @@ const TaxSettingsPage = () => {
     });
   };
 
-  const handleExemptionSubmit = (e) => {
+  const handleExemptionSubmit = async (e) => {
     e.preventDefault();
-    if (editingExemption) {
-      toast.success('Exemption updated successfully');
-    } else {
-      toast.success('Exemption added successfully');
-    }
+    const record = { ...exemptionForm, id: editingExemption?.id || Date.now() };
+    const exemptions = editingExemption
+      ? settings.exemptions.map((item) => item.id === editingExemption.id ? record : item)
+      : [...settings.exemptions, record];
+    await persistSettings({ ...settings, exemptions });
+    toast.success(`Exemption ${editingExemption ? 'updated' : 'added'} successfully`);
     setShowExemptionModal(false);
     setEditingExemption(null);
     setExemptionForm({
@@ -177,8 +197,10 @@ const TaxSettingsPage = () => {
     });
   };
 
-  const handleDelete = (type, id) => {
+  const handleDelete = async (type, id) => {
     if (window.confirm('Are you sure you want to delete this?')) {
+      const key = type === 'rate' ? 'tax_rates' : type === 'rule' ? 'tax_rules' : 'exemptions';
+      await persistSettings({ ...settings, [key]: settings[key].filter((item) => item.id !== id) });
       toast.success('Deleted successfully');
     }
   };

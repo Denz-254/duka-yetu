@@ -27,46 +27,55 @@ import {
   FaBarcode
 } from 'react-icons/fa';
 import useAuthStore from '../../store/authStore';
+import useSubscriptionStore from '../../store/subscriptionStore';
 
 const Sidebar = ({ isOpen, toggleSidebar }) => {
   const location = useLocation();
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
+  const subscriptionActive = useSubscriptionStore((state) => state.active);
+  const features = useSubscriptionStore((state) => state.features);
+  const clearSubscription = useSubscriptionStore((state) => state.clear);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [inventoryOpen, setInventoryOpen] = useState(false);
 
   const navItems = [
-    { path: '/dashboard', icon: FaHome, label: 'Dashboard' },
-    { path: '/pos', icon: FaShoppingCart, label: 'POS' },
+    { path: '/dashboard', icon: FaHome, label: 'Dashboard', feature: 'basic_reports' },
+    { path: '/pos', icon: FaShoppingCart, label: 'POS', feature: 'pos' },
   ];
 
   const inventoryItems = [
-    { path: '/products', icon: FaBoxes, label: 'All Products' },
-    { path: '/inventory/categories', icon: FaTags, label: 'Categories' },
-    { path: '/inventory/stock', icon: FaBarcode, label: 'Stock Management' },
-    { path: '/inventory/suppliers', icon: FaTruck, label: 'Suppliers' },
+    { path: '/products', icon: FaBoxes, label: 'All Products', feature: 'products' },
+    { path: '/categories', icon: FaTags, label: 'Categories', feature: 'inventory', ownerOnly: true },
+    { path: '/stock-management', icon: FaBarcode, label: 'Stock Management', feature: 'inventory', ownerOnly: true },
+    { path: '/suppliers', icon: FaTruck, label: 'Suppliers', feature: 'suppliers', ownerOnly: true },
   ];
 
   const navItemsBottom = [
-    { path: '/reports', icon: FaChartBar, label: 'Reports' },
-    { path: '/staff', icon: FaUsers, label: 'Staff' },
-    { path: '/customers', icon: FaUserFriends, label: 'Customers' },
-    { path: '/branches', icon: FaBuilding, label: 'Branches' },
+    { path: '/reports', icon: FaChartBar, label: 'Reports', feature: 'basic_reports' },
+    { path: '/staff', icon: FaUsers, label: 'Staff', feature: 'business_settings', ownerOnly: true },
+    { path: '/customers', icon: FaUserFriends, label: 'Customers', feature: 'customers' },
+    { path: '/branches', icon: FaBuilding, label: 'Branches', feature: 'business_settings', ownerOnly: true },
   ];
 
   const settingsItems = [
-    { path: '/settings/profile', icon: FaUserCircle, label: 'Business Profile' },
-    { path: '/settings/payment', icon: FaCreditCard, label: 'Payment Settings' },
-    { path: '/settings/receipt', icon: FaReceipt, label: 'Receipt Settings' },
-    { path: '/settings/tax', icon: FaClipboardList, label: 'Tax Settings' },
-    { path: '/settings/subscription', icon: FaCrown, label: 'Subscription' },
-    { path: '/settings/security', icon: FaShieldAlt, label: 'Security Settings' },
+    { path: '/settings/profile', icon: FaUserCircle, label: 'Business Profile', feature: 'business_settings', ownerOnly: true },
+    { path: '/settings/payment', icon: FaCreditCard, label: 'Payment Settings', feature: 'business_settings', ownerOnly: true },
+    { path: '/settings/receipt', icon: FaReceipt, label: 'Receipt Settings', feature: 'business_settings', ownerOnly: true },
+    { path: '/settings/tax', icon: FaClipboardList, label: 'Tax Settings', feature: 'business_settings', ownerOnly: true },
+    { path: '/settings/subscription', icon: FaCrown, label: 'Subscription', ownerOnly: true },
+    { path: '/settings/security', icon: FaShieldAlt, label: 'Security Settings', feature: 'business_settings', ownerOnly: true },
   ];
 
   const isActive = (path) => location.pathname === path;
-  const isInventoryActive = () => location.pathname.startsWith('/inventory') || location.pathname === '/products';
+  const canAccess = (item) => {
+    if (item.ownerOnly && user?.role !== 'OWNER') return false;
+    return !item.feature || (subscriptionActive && features.includes(item.feature));
+  };
+  const isInventoryActive = () => inventoryItems.some(({ path }) => location.pathname === path);
 
   const handleLogout = () => {
+    clearSubscription();
     logout();
     window.location.href = '/login';
   };
@@ -126,7 +135,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
       {/* Navigation */}
       <div className="flex-1 overflow-y-auto py-4 px-3 h-[calc(100vh-200px)] scrollbar-thin scrollbar-thumb-primary-600 scrollbar-track-transparent">
         {/* Main Nav Items */}
-        {navItems.map((item) => {
+        {navItems.filter(canAccess).map((item) => {
           const Icon = item.icon;
           return (
             <Link
@@ -194,7 +203,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                 transition={{ duration: 0.2 }}
                 className="ml-6 mt-1 space-y-1 overflow-hidden"
               >
-                {inventoryItems.map((item) => {
+                {inventoryItems.filter(canAccess).map((item) => {
                   const Icon = item.icon;
                   return (
                     <Link
@@ -217,7 +226,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         </div>
 
         {/* Bottom Nav Items */}
-        {navItemsBottom.map((item) => {
+        {navItemsBottom.filter(canAccess).map((item) => {
           const Icon = item.icon;
           return (
             <Link
@@ -285,7 +294,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                 transition={{ duration: 0.2 }}
                 className="ml-6 mt-1 space-y-1 overflow-hidden"
               >
-                {settingsItems.map((item) => {
+                {settingsItems.filter(canAccess).map((item) => {
                   const Icon = item.icon;
                   return (
                     <Link

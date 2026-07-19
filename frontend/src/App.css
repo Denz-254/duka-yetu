@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 @theme {
+  --font-sans: "Segoe UI Variable", "Aptos", ui-sans-serif, system-ui, sans-serif;
   --color-primary-50: #ECFDF5;
   --color-primary-100: #D1FAE5;
   --color-primary-200: #A7F3D0;
@@ -15,7 +16,7 @@
 
 @layer base {
   body {
-    @apply bg-primary-50 text-gray-800 antialiased;
+    @apply bg-primary-50 text-gray-800 antialiased font-sans;
   }
 }
 

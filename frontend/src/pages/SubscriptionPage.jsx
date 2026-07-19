@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
   FaCrown, FaRocket, FaGem, FaCheckCircle, FaTimesCircle,
@@ -10,11 +10,17 @@ import {
   FaDatabase, FaDownload, FaMobileAlt
 } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
+import { subscription as subscriptionApi } from '../api/endpoints';
 
 const SubscriptionPage = () => {
-  const [currentPlan, setCurrentPlan] = useState('professional');
+  const [currentPlan, setCurrentPlan] = useState('basic');
   const [billingCycle, setBillingCycle] = useState('monthly');
   const [loading, setLoading] = useState(false);
+  const [subscriptionStatus, setSubscriptionStatus] = useState('LOADING');
+  const [currentPeriodEnd, setCurrentPeriodEnd] = useState(null);
+  const [usageStats, setUsageStats] = useState({
+    users: 0, max_users: 3, branches: 0, max_branches: 1,
+  });
 
   const plans = [
     {
@@ -88,39 +94,43 @@ const SubscriptionPage = () => {
     },
   ];
 
-  const usageStats = {
-    current_plan: 'Professional',
-    users: 8,
-    max_users: 15,
-    branches: 3,
-    max_branches: 10,
-    products: 156,
-    max_products: 'Unlimited',
-    storage_used: '2.4 GB',
-    storage_limit: '10 GB',
-    api_calls: '4,823',
-    api_limit: '10,000',
-  };
+  const billingHistory = [];
 
-  const billingHistory = [
-    { id: 1, date: '2026-07-01', amount: 5000, description: 'Monthly Subscription - July 2026', status: 'paid' },
-    { id: 2, date: '2026-06-01', amount: 5000, description: 'Monthly Subscription - June 2026', status: 'paid' },
-    { id: 3, date: '2026-05-01', amount: 5000, description: 'Monthly Subscription - May 2026', status: 'paid' },
-    { id: 4, date: '2026-04-01', amount: 5000, description: 'Monthly Subscription - April 2026', status: 'paid' },
-  ];
+  useEffect(() => {
+    subscriptionApi.get()
+      .then(({ data }) => {
+        setCurrentPlan(data.plan.toLowerCase());
+        setSubscriptionStatus(data.status);
+        setCurrentPeriodEnd(data.current_period_end || data.trial_ends_at);
+        setUsageStats({
+          users: data.usage.staff,
+          max_users: data.limits.staff ?? 'Unlimited',
+          branches: data.usage.branches || 0,
+          max_branches: data.limits.branches ?? 'Unlimited',
+        });
+      })
+      .catch((error) => toast.error(error.response?.data?.detail || 'Failed to load subscription'));
+  }, []);
 
-  const handleUpgrade = (planId) => {
+  const handleUpgrade = async (planId) => {
     setLoading(true);
-    setTimeout(() => {
-      toast.success(`Upgraded to ${plans.find(p => p.id === planId)?.name} plan successfully!`);
-      setCurrentPlan(planId);
+    try {
+      const { data } = await subscriptionApi.checkout(planId, billingCycle);
+      window.location.assign(data.checkout_url);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Unable to start checkout');
       setLoading(false);
-    }, 1500);
+    }
   };
 
-  const handleCancelSubscription = () => {
-    if (window.confirm('Are you sure you want to cancel your subscription?')) {
-      toast.success('Subscription cancelled successfully');
+  const openBillingPortal = async () => {
+    setLoading(true);
+    try {
+      const { data } = await subscriptionApi.portal();
+      window.location.assign(data.portal_url);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Unable to open billing portal');
+      setLoading(false);
     }
   };
 
@@ -152,12 +162,12 @@ const SubscriptionPage = () => {
             </div>
             <div className="bg-white/20 rounded-lg px-4 py-2 text-center">
               <p className="text-sm text-primary-100">Next Billing</p>
-              <p className="font-semibold">Aug 1, 2026</p>
+              <p className="font-semibold">{currentPeriodEnd ? new Date(currentPeriodEnd).toLocaleDateString('en-KE') : 'Not scheduled'}</p>
             </div>
             <div className="bg-white/20 rounded-lg px-4 py-2 text-center">
               <p className="text-sm text-primary-100">Status</p>
               <p className="font-semibold flex items-center gap-1">
-                <FaCheckCircle className="text-green-300" /> Active
+                <FaCheckCircle className="text-green-300" /> {subscriptionStatus}
               </p>
             </div>
           </div>
@@ -176,11 +186,11 @@ const SubscriptionPage = () => {
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
           <p className="text-sm text-gray-500">Products</p>
-          <p className="text-2xl font-bold text-gray-800">{usageStats.products} / {usageStats.max_products}</p>
+          <p className="text-2xl font-bold text-gray-800">Unlimited</p>
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
           <p className="text-sm text-gray-500">Storage</p>
-          <p className="text-2xl font-bold text-gray-800">{usageStats.storage_used} / {usageStats.storage_limit}</p>
+          <p className="text-2xl font-bold text-gray-800">Cloud</p>
         </div>
       </div>
 
@@ -188,7 +198,7 @@ const SubscriptionPage = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {plans.map((plan) => {
           const Icon = plan.icon;
-          const isCurrent = plan.id === currentPlan;
+          const isCurrent = plan.id === currentPlan && subscriptionStatus === 'ACTIVE';
           return (
             <motion.div
               key={plan.id}
@@ -304,6 +314,9 @@ const SubscriptionPage = () => {
               </tr>
             </thead>
             <tbody>
+              {billingHistory.length === 0 && (
+                <tr><td colSpan="5" className="py-8 text-center text-sm text-gray-500">Invoices are available in the secure billing portal.</td></tr>
+              )}
               {billingHistory.map((bill) => (
                 <tr key={bill.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                   <td className="py-3 px-4 text-sm text-gray-600">{bill.date}</td>
@@ -329,19 +342,19 @@ const SubscriptionPage = () => {
       {/* Actions */}
       <div className="flex flex-wrap gap-4">
         <button
-          onClick={() => toast.success('Payment method updated successfully')}
+          onClick={openBillingPortal}
           className="btn-primary flex items-center gap-2"
         >
           <FaCreditCard /> Update Payment Method
         </button>
         <button
-          onClick={() => toast.success('Invoice requested successfully')}
+          onClick={openBillingPortal}
           className="btn-secondary flex items-center gap-2"
         >
           <FaFileInvoice /> Request Invoice
         </button>
         <button
-          onClick={handleCancelSubscription}
+          onClick={openBillingPortal}
           className="btn-danger flex items-center gap-2"
         >
           <FaTimesCircle /> Cancel Subscription

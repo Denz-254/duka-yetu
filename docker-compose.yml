@@ -29,6 +29,15 @@ services:
       - CLOUDINARY_API_KEY=${CLOUDINARY_API_KEY}
       - CLOUDINARY_API_SECRET=${CLOUDINARY_API_SECRET}
       - CLOUDINARY_UPLOAD_PRESET=duka_yetu
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - STRIPE_BASIC_MONTHLY_PRICE_ID=${STRIPE_BASIC_MONTHLY_PRICE_ID}
+      - STRIPE_BASIC_YEARLY_PRICE_ID=${STRIPE_BASIC_YEARLY_PRICE_ID}
+      - STRIPE_PROFESSIONAL_MONTHLY_PRICE_ID=${STRIPE_PROFESSIONAL_MONTHLY_PRICE_ID}
+      - STRIPE_PROFESSIONAL_YEARLY_PRICE_ID=${STRIPE_PROFESSIONAL_YEARLY_PRICE_ID}
+      - STRIPE_ENTERPRISE_MONTHLY_PRICE_ID=${STRIPE_ENTERPRISE_MONTHLY_PRICE_ID}
+      - STRIPE_ENTERPRISE_YEARLY_PRICE_ID=${STRIPE_ENTERPRISE_YEARLY_PRICE_ID}
     depends_on:
       db:
         condition: service_healthy
@@ -37,19 +46,18 @@ services:
       - ./tests:/app/tests
       - ./migrations:/app/migrations
       - ./alembic.ini:/app/alembic.ini
-      - ./docker-entrypoint.sh:/docker-entrypoint.sh
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     networks:
       - duka-network
 
   frontend:
     build:
-      context: .
-      dockerfile: frontend/Dockerfile
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: /api/v1
     ports:
       - "3000:80"
-    environment:
-      - VITE_API_URL=https://cautious-lamp-4jwpwqrgrw4jf7pvx-8001.app.github.dev/api/v1
     depends_on:
       - api
     networks:

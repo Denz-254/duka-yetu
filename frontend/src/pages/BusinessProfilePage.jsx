@@ -2,11 +2,9 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { FaStore, FaUser, FaPhone, FaEnvelope, FaMapMarkerAlt, FaBuilding, FaSave, FaCamera } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
-import useAuthStore from '../../src/store/authStore';
-import api from '../../src/api/client';
+import { business as businessApi, upload } from '../api/endpoints';
 
 const BusinessProfilePage = () => {
-  const user = useAuthStore((state) => state.user);
   const [loading, setLoading] = useState(false);
   const [business, setBusiness] = useState({
     name: '',
@@ -27,19 +25,8 @@ const BusinessProfilePage = () => {
   const fetchBusinessProfile = async () => {
     setLoading(true);
     try {
-      // In production, this would call a business profile API
-      // For now, use user data
-      setBusiness({
-        name: user?.business_name || 'Duka Yetu Store',
-        email: user?.email || 'info@dukayetu.com',
-        phone: user?.phone || '+254 712 345 678',
-        address: '123 Main Street',
-        city: 'Nairobi',
-        country: 'Kenya',
-        logo: '',
-        tax_id: '123456789',
-        description: 'Your trusted business partner',
-      });
+      const response = await businessApi.getProfile();
+      setBusiness((current) => ({ ...current, ...response.data }));
     } catch (error) {
       toast.error('Failed to load business profile');
     } finally {
@@ -51,10 +38,27 @@ const BusinessProfilePage = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      // In production, this would save to a business profile API
+      await businessApi.updateProfile(business);
       toast.success('Business profile updated successfully');
     } catch (error) {
       toast.error('Failed to update business profile');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogoUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setLoading(true);
+    try {
+      const response = await upload.image(file);
+      const updated = { ...business, logo: response.data.url };
+      setBusiness(updated);
+      await businessApi.updateProfile(updated);
+      toast.success('Business logo updated');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to upload logo');
     } finally {
       setLoading(false);
     }
@@ -79,9 +83,10 @@ const BusinessProfilePage = () => {
               ) : (
                 <FaStore className="text-primary-600 text-3xl" />
               )}
-              <button type="button" className="absolute bottom-0 right-0 p-1 bg-primary-600 text-white rounded-full hover:bg-primary-700 transition-colors">
+              <label className="absolute bottom-0 right-0 p-1 bg-primary-600 text-white rounded-full hover:bg-primary-700 transition-colors cursor-pointer">
                 <FaCamera className="text-xs" />
-              </button>
+                <input type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
+              </label>
             </div>
             <div>
               <h3 className="font-semibold text-gray-800">{business.name}</h3>

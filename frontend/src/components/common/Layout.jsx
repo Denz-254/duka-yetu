@@ -1,9 +1,15 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
+import useSubscriptionStore from '../../store/subscriptionStore';
 
 const Layout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const fetchSubscription = useSubscriptionStore((state) => state.fetchSubscription);
+
+  useEffect(() => {
+    fetchSubscription();
+  }, [fetchSubscription]);
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);

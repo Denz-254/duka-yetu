@@ -3,7 +3,7 @@ import { toast } from 'react-hot-toast';
 import { FaCloudUploadAlt, FaSpinner, FaTimes } from 'react-icons/fa';
 import useProductStore from '../../store/productStore';
 import useAuthStore from '../../store/authStore';
-import api from '../../api/client';
+import { upload } from '../../api/endpoints';
 
 const ProductForm = ({ product, onSuccess, onCancel }) => {
   const [formData, setFormData] = useState({
@@ -57,14 +57,8 @@ const ProductForm = ({ product, onSuccess, onCancel }) => {
     }
 
     setUploading(true);
-    const formData = new FormData();
-    formData.append('file', file);
-
     try {
-      const response = await api.post('/upload/', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-        timeout: 30000, // Increase to 30 seconds
-      });
+      const response = await upload.image(file);
 
       setImagePreview(response.data.url);
       setFormData(prev => ({ ...prev, image_url: response.data.url }));

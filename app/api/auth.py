@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 from app.core.database import get_db
+from app.core.dependencies import get_current_user
 from app.core.security import (
     create_access_token,
     verify_password,
@@ -22,6 +23,7 @@ from app.schemas.auth import (
     UserResponse,
     BusinessResponse,
     TokenResponse,
+    ChangePasswordRequest,
 )
 
 router = APIRouter()
@@ -68,6 +70,8 @@ async def register(
         email=request.email,
         password_hash=get_password_hash(request.password),
         package="BASIC",
+        subscription_status="TRIALING",
+        trial_ends_at=datetime.utcnow() + timedelta(days=14),
         is_active=True,
     )
     db.add(business)
@@ -148,6 +152,11 @@ async def login(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid username or password",
         )
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This user account is disabled.",
+        )
     
     # Update login time
     user.login_time = datetime.utcnow()
@@ -160,6 +169,11 @@ async def login(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Business not found",
+        )
+    if not business.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This business account is disabled.",
         )
     
     # Create JWT token
@@ -197,3 +211,28 @@ async def login(
             expires_in=1440,
         ),
     )
+
+
+@router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)
+async def change_password(
+    request: ChangePasswordRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if not verify_password(request.current_password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect.",
+        )
+    if not (
+        any(c.isupper() for c in request.new_password)
+        and any(c.islower() for c in request.new_password)
+        and any(c.isdigit() for c in request.new_password)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="New password must include uppercase, lowercase, and a number.",
+        )
+    current_user.password_hash = get_password_hash(request.new_password)
+    db.commit()
+    return None

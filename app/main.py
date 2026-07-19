@@ -1,6 +1,6 @@
 """Duka Yetu POS System - Main Application."""
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from contextlib import asynccontextmanager
@@ -8,7 +8,8 @@ from datetime import datetime
 
 from app.core.config import settings
 from app.core.database import init_db, engine
-from app.api import auth, products, sales, dashboard, upload
+from app.api import auth, products, sales, dashboard, upload, subscription, resources
+from app.core.dependencies import require_feature
 from app.domains.users.routes import router as users_router
 
 # Use lifespan instead of on_event (modern FastAPI)
@@ -65,11 +66,42 @@ app.add_middleware(
 
 # Include routers
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
-app.include_router(products.router, prefix="/api/v1/products", tags=["Products"])
-app.include_router(sales.router, prefix="/api/v1/sales", tags=["Sales"])
-app.include_router(dashboard.router, prefix="/api/v1/dashboard", tags=["Dashboard"])
-app.include_router(users_router, prefix="/api/v1", tags=["Users"])
-app.include_router(upload.router, prefix="/api/v1/upload", tags=["Upload"])
+app.include_router(
+    products.router,
+    prefix="/api/v1/products",
+    tags=["Products"],
+    dependencies=[Depends(require_feature("products"))],
+)
+app.include_router(
+    sales.router,
+    prefix="/api/v1/sales",
+    tags=["Sales"],
+    dependencies=[Depends(require_feature("pos"))],
+)
+app.include_router(
+    dashboard.router,
+    prefix="/api/v1/dashboard",
+    tags=["Dashboard"],
+    dependencies=[Depends(require_feature("basic_reports"))],
+)
+app.include_router(
+    users_router,
+    prefix="/api/v1",
+    tags=["Users"],
+    dependencies=[Depends(require_feature("business_settings"))],
+)
+app.include_router(
+    upload.router,
+    prefix="/api/v1/upload",
+    tags=["Upload"],
+    dependencies=[Depends(require_feature("products"))],
+)
+app.include_router(
+    subscription.router,
+    prefix="/api/v1/subscription",
+    tags=["Subscription"],
+)
+app.include_router(resources.router, prefix="/api/v1", tags=["Business Resources"])
 
 @app.get("/")
 async def root():

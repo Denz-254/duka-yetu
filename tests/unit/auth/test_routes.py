@@ -12,6 +12,7 @@ def test_register(client: TestClient, test_session):
         json={
             "business_name": "Test Business",
             "owner_name": "Test Owner",
+            "username": f"owner_{uuid.uuid4().hex[:8]}",
             "email": "test@example.com",
             "phone": "0712345678",
             "password": "StrongPass123!",
@@ -23,7 +24,7 @@ def test_register(client: TestClient, test_session):
     assert response.status_code in [200, 201, 422]
     if response.status_code in [200, 201]:
         data = response.json()
-        assert "access_token" in data
+        assert "access_token" in data["token"]
 
 def test_register_duplicate_email(client: TestClient, test_session):
     """Test registration with duplicate email."""
@@ -34,6 +35,7 @@ def test_register_duplicate_email(client: TestClient, test_session):
         json={
             "business_name": "Test Business",
             "owner_name": "Test Owner",
+            "username": f"owner_{uuid.uuid4().hex[:8]}",
             "email": unique_email,
             "phone": "0712345678",
             "password": "StrongPass123!",
@@ -47,6 +49,7 @@ def test_register_duplicate_email(client: TestClient, test_session):
         json={
             "business_name": "Another Business",
             "owner_name": "Another Owner",
+            "username": f"owner_{uuid.uuid4().hex[:8]}",
             "email": unique_email,  # Same email
             "phone": "0798765432",
             "password": "AnotherPass123!",
@@ -61,11 +64,13 @@ def test_login(client: TestClient, test_session):
     import uuid
     # First register a user with unique email
     unique_email = f"login_{uuid.uuid4().hex[:8]}@example.com"
+    unique_username = f"login_{uuid.uuid4().hex[:8]}"
     register_response = client.post(
         "/api/v1/auth/register",
         json={
             "business_name": "Login Business",
             "owner_name": "Login Owner",
+            "username": unique_username,
             "email": unique_email,
             "phone": "0712345678",
             "password": "StrongPass123!",
@@ -81,20 +86,20 @@ def test_login(client: TestClient, test_session):
     response = client.post(
         "/api/v1/auth/login",
         json={
-            "email": unique_email,
+            "username": unique_username,
             "password": "StrongPass123!",
         },
     )
     assert response.status_code == 200
     data = response.json()
-    assert "access_token" in data
+    assert "access_token" in data["token"]
 
 def test_login_invalid_credentials(client: TestClient, test_session):
     """Test login with invalid credentials."""
     response = client.post(
         "/api/v1/auth/login",
         json={
-            "email": "nonexistent@example.com",
+            "username": "nonexistent",
             "password": "WrongPass123!",
         },
     )

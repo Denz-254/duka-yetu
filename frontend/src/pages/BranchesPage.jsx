@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
   FaBuilding, FaPlus, FaEdit, FaTrash, FaMapMarkerAlt,
@@ -7,49 +7,55 @@ import {
 } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
 import { formatCurrency } from '../utils/helpers';
+import { branches as branchesApi } from '../api/endpoints';
 
 const BranchesPage = () => {
-  const [branches, setBranches] = useState([
-    {
-      id: 1,
-      name: 'Main Store',
-      location: 'Nairobi, Kenya',
-      phone: '+254 712 345 678',
-      email: 'main@dukayetu.com',
-      status: 'active',
-      staff: 8,
-      sales: 324,
-      revenue: 1245000,
-      manager: 'John Doe',
-    },
-    {
-      id: 2,
-      name: 'Westlands Branch',
-      location: 'Westlands, Nairobi',
-      phone: '+254 723 456 789',
-      email: 'westlands@dukayetu.com',
-      status: 'active',
-      staff: 5,
-      sales: 189,
-      revenue: 876000,
-      manager: 'Jane Smith',
-    },
-    {
-      id: 3,
-      name: 'Karen Branch',
-      location: 'Karen, Nairobi',
-      phone: '+254 734 567 890',
-      email: 'karen@dukayetu.com',
-      status: 'inactive',
-      staff: 0,
-      sales: 0,
-      revenue: 0,
-      manager: 'Unassigned',
-    },
-  ]);
+  const [branches, setBranches] = useState([]);
 
   const [showModal, setShowModal] = useState(false);
   const [editingBranch, setEditingBranch] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '', location: '', phone: '', email: '', manager: '', status: 'active',
+  });
+
+  const fetchBranches = async () => {
+    setLoading(true);
+    try {
+      const response = await branchesApi.getAll();
+      setBranches(response.data);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to load branches');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchBranches(); }, []);
+
+  const openForm = (branch = null) => {
+    setEditingBranch(branch);
+    setFormData(branch ? {
+      name: branch.name || '', location: branch.location || '', phone: branch.phone || '',
+      email: branch.email || '', manager: branch.manager || '', status: branch.status || 'active',
+    } : { name: '', location: '', phone: '', email: '', manager: '', status: 'active' });
+    setShowModal(true);
+  };
+
+  const saveBranch = async (event) => {
+    event.preventDefault();
+    setLoading(true);
+    try {
+      if (editingBranch) await branchesApi.update(editingBranch.id, formData);
+      else await branchesApi.create(formData);
+      toast.success(`Branch ${editingBranch ? 'updated' : 'created'} successfully`);
+      setShowModal(false);
+      await fetchBranches();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to save branch');
+      setLoading(false);
+    }
+  };
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -81,8 +87,7 @@ const BranchesPage = () => {
         </div>
         <button
           onClick={() => {
-            setEditingBranch(null);
-            setShowModal(true);
+            openForm();
           }}
           className="btn-primary flex items-center gap-2"
         >
@@ -178,8 +183,7 @@ const BranchesPage = () => {
               <div className="mt-3 flex items-center justify-end gap-2">
                 <button
                   onClick={() => {
-                    setEditingBranch(branch);
-                    setShowModal(true);
+                    openForm(branch);
                   }}
                   className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
                 >
@@ -187,9 +191,10 @@ const BranchesPage = () => {
                 </button>
                 <button
                   onClick={() => {
-                    if (window.confirm('Are you sure you want to delete this branch?')) {
-                      toast.success('Branch deleted successfully');
-                    }
+                    if (!window.confirm('Are you sure you want to delete this branch?')) return;
+                    branchesApi.delete(branch.id)
+                      .then(() => { toast.success('Branch deleted successfully'); fetchBranches(); })
+                      .catch((error) => toast.error(error.response?.data?.detail || 'Failed to delete branch'));
                   }}
                   className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                 >
@@ -221,18 +226,15 @@ const BranchesPage = () => {
               </button>
             </div>
 
-            <form className="space-y-4" onSubmit={(e) => {
-              e.preventDefault();
-              toast.success(editingBranch ? 'Branch updated successfully' : 'Branch created successfully');
-              setShowModal(false);
-            }}>
+            <form className="space-y-4" onSubmit={saveBranch}>
               <div>
                 <label className="label-primary">Branch Name</label>
                 <input
                   type="text"
                   className="input-primary bg-white text-gray-800"
                   placeholder="Enter branch name"
-                  defaultValue={editingBranch?.name || ''}
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   required
                 />
               </div>
@@ -243,7 +245,8 @@ const BranchesPage = () => {
                   type="text"
                   className="input-primary bg-white text-gray-800"
                   placeholder="Enter location"
-                  defaultValue={editingBranch?.location || ''}
+                  value={formData.location}
+                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                   required
                 />
               </div>
@@ -254,7 +257,8 @@ const BranchesPage = () => {
                   type="tel"
                   className="input-primary bg-white text-gray-800"
                   placeholder="+254 712 345 678"
-                  defaultValue={editingBranch?.phone || ''}
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                 />
               </div>
 
@@ -264,7 +268,8 @@ const BranchesPage = () => {
                   type="email"
                   className="input-primary bg-white text-gray-800"
                   placeholder="branch@dukayetu.com"
-                  defaultValue={editingBranch?.email || ''}
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 />
               </div>
 
@@ -274,7 +279,8 @@ const BranchesPage = () => {
                   type="text"
                   className="input-primary bg-white text-gray-800"
                   placeholder="Enter manager name"
-                  defaultValue={editingBranch?.manager || ''}
+                  value={formData.manager}
+                  onChange={(e) => setFormData({ ...formData, manager: e.target.value })}
                 />
               </div>
 
@@ -282,7 +288,8 @@ const BranchesPage = () => {
                 <label className="label-primary">Status</label>
                 <select
                   className="input-primary bg-white text-gray-800"
-                  defaultValue={editingBranch?.status || 'active'}
+                  value={formData.status}
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                 >
                   <option value="active">Active</option>
                   <option value="inactive">Inactive</option>
@@ -291,8 +298,8 @@ const BranchesPage = () => {
               </div>
 
               <div className="flex gap-3 pt-2">
-                <button type="submit" className="btn-primary flex-1 py-3">
-                  {editingBranch ? 'Update Branch' : 'Create Branch'}
+                <button type="submit" disabled={loading} className="btn-primary flex-1 py-3">
+                  {loading ? 'Saving...' : editingBranch ? 'Update Branch' : 'Create Branch'}
                 </button>
                 <button
                   type="button"

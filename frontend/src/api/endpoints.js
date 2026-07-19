@@ -11,7 +11,7 @@ export const products = {
   create: (data) => api.post('/products/', data),
   update: (id, data) => api.put(`/products/${id}`, data),
   delete: (id) => api.delete(`/products/${id}`),
-  lowStock: () => api.get('/products/low-stock/'),
+  lowStock: () => api.get('/products/alerts/low-stock'),
 };
 
 export const sales = {
@@ -38,15 +38,42 @@ export const users = {
   toggle: (id) => api.post(`/users/${id}/toggle`),
 };
 
-// frontend/src/api/endpoints.js - Update the upload endpoint
 export const upload = {
   image: (file) => {
     const formData = new FormData();
     formData.append('file', file);
-    return api.post('/upload/', formData, {  // ← Note the trailing slash
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
+    return api.post('/upload/single', formData, {
+      // Let the browser set the multipart boundary.
+      headers: { 'Content-Type': undefined },
+      timeout: 30000,
     });
   },
+};
+
+const crud = (path) => ({
+  getAll: () => api.get(`/${path}/`),
+  create: (data) => api.post(`/${path}/`, data),
+  update: (id, data) => api.put(`/${path}/${id}`, data),
+  delete: (id) => api.delete(`/${path}/${id}`),
+});
+
+export const categories = crud('categories');
+export const suppliers = crud('suppliers');
+export const customers = crud('customers');
+export const branches = crud('branches');
+
+export const business = {
+  getProfile: () => api.get('/business/profile'),
+  updateProfile: (data) => api.put('/business/profile', data),
+  getSettings: (section) => api.get(`/business/settings/${section}`),
+  updateSettings: (section, values) => api.put('/business/settings', { section, values }),
+};
+
+export const subscription = {
+  get: () => api.get('/subscription/'),
+  checkout: (plan, billingCycle) => api.post('/subscription/checkout', {
+    plan: plan.toUpperCase(),
+    billing_cycle: billingCycle,
+  }),
+  portal: () => api.post('/subscription/portal'),
 };

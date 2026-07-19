@@ -3,16 +3,14 @@ FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files
-COPY frontend/package*.json ./
-COPY frontend/vite.config.js ./
 COPY package*.json ./
 
-# Install dependencies - clean install
-RUN npm ci --legacy-peer-deps || npm install --legacy-peer-deps
+RUN npm ci --legacy-peer-deps
 
-# Copy source code
-COPY frontend/ ./
+COPY . .
+
+ARG VITE_API_URL=/api/v1
+ENV VITE_API_URL=${VITE_API_URL}
 
 # Build the app
 RUN npm run build

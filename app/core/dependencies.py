@@ -9,6 +9,7 @@ from app.core.database import get_db
 from app.core.security import decode_token, validate_token_expiry
 from app.models.user import User
 from app.models.business import Business
+from app.core.plans import plan_has_feature, subscription_is_active
 
 # Security scheme
 security_scheme = HTTPBearer()
@@ -95,6 +96,27 @@ async def require_owner_or_admin(
             detail="Only owners and admins can perform this action",
         )
     return current_user
+
+
+def require_feature(feature: str):
+    """Create a dependency that enforces paid plan entitlements server-side."""
+
+    async def dependency(
+        business: Business = Depends(get_current_business),
+    ) -> Business:
+        if not subscription_is_active(business):
+            raise HTTPException(
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                detail="Your subscription is not active. Choose a plan to continue.",
+            )
+        if not plan_has_feature(business, feature):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"The '{feature}' feature is not included in your current plan.",
+            )
+        return business
+
+    return dependency
 
 async def get_cashier_user(
     current_user: User = Depends(get_current_user),

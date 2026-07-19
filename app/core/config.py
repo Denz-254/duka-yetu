@@ -48,6 +48,16 @@ class Settings(BaseSettings):
     CLOUDINARY_API_SECRET: str = Field(default="")
     CLOUDINARY_UPLOAD_PRESET: str = Field(default="duka_yetu")
 
+    # Stripe Billing
+    STRIPE_SECRET_KEY: str = Field(default="")
+    STRIPE_WEBHOOK_SECRET: str = Field(default="")
+    STRIPE_BASIC_MONTHLY_PRICE_ID: str = Field(default="")
+    STRIPE_BASIC_YEARLY_PRICE_ID: str = Field(default="")
+    STRIPE_PROFESSIONAL_MONTHLY_PRICE_ID: str = Field(default="")
+    STRIPE_PROFESSIONAL_YEARLY_PRICE_ID: str = Field(default="")
+    STRIPE_ENTERPRISE_MONTHLY_PRICE_ID: str = Field(default="")
+    STRIPE_ENTERPRISE_YEARLY_PRICE_ID: str = Field(default="")
+
     # Use ConfigDict instead of class Config
     model_config = ConfigDict(
         env_file=".env",

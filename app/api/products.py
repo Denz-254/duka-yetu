@@ -187,7 +187,7 @@ async def delete_product(
     
     return None
 
-@router.get("/low-stock/", response_model=list[ProductResponse])
+@router.get("/alerts/low-stock", response_model=list[ProductResponse])
 async def get_low_stock_products(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_owner),

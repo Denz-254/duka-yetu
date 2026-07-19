@@ -1,20 +1,25 @@
 """File upload routes using Cloudinary."""
 
 from fastapi import APIRouter, UploadFile, File, HTTPException, status, Depends
-from fastapi.responses import JSONResponse
 import cloudinary
 import cloudinary.uploader
 from typing import List
 import os
+import re
+import uuid
 
 from app.core.config import settings
-from app.core.dependencies import get_current_user, require_owner
+from app.core.dependencies import require_owner
 from app.models.user import User
 
 router = APIRouter()
 
 # Configure Cloudinary only if credentials are provided
-if settings.CLOUDINARY_CLOUD_NAME:
+if all([
+    settings.CLOUDINARY_CLOUD_NAME,
+    settings.CLOUDINARY_API_KEY,
+    settings.CLOUDINARY_API_SECRET,
+]):
     cloudinary.config(
         cloud_name=settings.CLOUDINARY_CLOUD_NAME,
         api_key=settings.CLOUDINARY_API_KEY,
@@ -27,10 +32,10 @@ else:
 @router.post("/single")
 async def upload_single_file(
     file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_owner),
 ):
     """Upload a single file to Cloudinary."""
-    if not settings.CLOUDINARY_CLOUD_NAME:
+    if not all([settings.CLOUDINARY_CLOUD_NAME, settings.CLOUDINARY_API_KEY, settings.CLOUDINARY_API_SECRET]):
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Cloudinary is not configured"
@@ -47,12 +52,18 @@ async def upload_single_file(
     try:
         # Read file content
         contents = await file.read()
+        if len(contents) > 5 * 1024 * 1024:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail="Image must be 5 MB or smaller.",
+            )
+        safe_name = re.sub(r"[^a-zA-Z0-9_-]+", "-", os.path.splitext(file.filename or "image")[0]).strip("-")
         
         # Upload to Cloudinary
         result = cloudinary.uploader.upload(
             contents,
             folder=f"duka_yetu/{current_user.business_id}",
-            public_id=f"{current_user.id}_{file.filename}",
+            public_id=f"{safe_name or 'image'}-{uuid.uuid4().hex}",
             resource_type="image",
         )
         
@@ -73,10 +84,10 @@ async def upload_single_file(
 @router.post("/multiple")
 async def upload_multiple_files(
     files: List[UploadFile] = File(...),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_owner),
 ):
     """Upload multiple files to Cloudinary."""
-    if not settings.CLOUDINARY_CLOUD_NAME:
+    if not all([settings.CLOUDINARY_CLOUD_NAME, settings.CLOUDINARY_API_KEY, settings.CLOUDINARY_API_SECRET]):
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Cloudinary is not configured"
@@ -84,14 +95,24 @@ async def upload_multiple_files(
 
     uploaded_files = []
     failed_files = []
+    if len(files) > 10:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A maximum of 10 images can be uploaded at once.",
+        )
 
     for file in files:
         try:
+            if file.content_type not in ["image/jpeg", "image/png", "image/gif", "image/webp"]:
+                raise ValueError(f"File type {file.content_type} is not allowed.")
             contents = await file.read()
+            if len(contents) > 5 * 1024 * 1024:
+                raise ValueError("Image must be 5 MB or smaller.")
+            safe_name = re.sub(r"[^a-zA-Z0-9_-]+", "-", os.path.splitext(file.filename or "image")[0]).strip("-")
             result = cloudinary.uploader.upload(
                 contents,
                 folder=f"duka_yetu/{current_user.business_id}",
-                public_id=f"{current_user.id}_{file.filename}",
+                public_id=f"{safe_name or 'image'}-{uuid.uuid4().hex}",
                 resource_type="image",
             )
             uploaded_files.append({
@@ -113,16 +134,22 @@ async def upload_multiple_files(
         "failed_count": len(failed_files),
     }
 
-@router.delete("/{public_id}")
+@router.delete("/{public_id:path}")
 async def delete_file(
     public_id: str,
     current_user: User = Depends(require_owner),
 ):
     """Delete a file from Cloudinary."""
-    if not settings.CLOUDINARY_CLOUD_NAME:
+    if not all([settings.CLOUDINARY_CLOUD_NAME, settings.CLOUDINARY_API_KEY, settings.CLOUDINARY_API_SECRET]):
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Cloudinary is not configured"
+        )
+    expected_prefix = f"duka_yetu/{current_user.business_id}/"
+    if not public_id.startswith(expected_prefix):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only delete images owned by your business.",
         )
 
     try:

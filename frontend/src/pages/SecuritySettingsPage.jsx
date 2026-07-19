@@ -1,13 +1,15 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
   FaShieldAlt, FaLock, FaUnlock, FaKey, FaUserShield,
   FaToggleOn, FaToggleOff, FaSave, FaEye, FaEyeSlash,
   FaCheckCircle, FaTimes, FaMobileAlt, FaEnvelope,
   FaGoogle, FaFacebook, FaGithub, FaPlus, FaTrash,
-  FaInfoCircle, FaExclamationTriangle
+  FaInfoCircle, FaExclamationTriangle, FaStore
 } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
+import api from '../api/client';
+import { business } from '../api/endpoints';
 
 const SecuritySettingsPage = () => {
   const [settings, setSettings] = useState({
@@ -49,6 +51,12 @@ const SecuritySettingsPage = () => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
+  useEffect(() => {
+    business.getSettings('security')
+      .then(({ data }) => setSettings((current) => ({ ...current, ...data })))
+      .catch(() => toast.error('Failed to load security settings'));
+  }, []);
+
   const recentLogins = [
     { 
       id: 1, 
@@ -86,12 +94,17 @@ const SecuritySettingsPage = () => {
     setSettings({ ...settings, [key]: !settings[key] });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    toast.success('Security settings saved successfully');
+    try {
+      await business.updateSettings('security', settings);
+      toast.success('Security settings saved successfully');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to save security settings');
+    }
   };
 
-  const handleChangePassword = (e) => {
+  const handleChangePassword = async (e) => {
     e.preventDefault();
     if (newPassword !== confirmPassword) {
       toast.error('Passwords do not match');
@@ -101,10 +114,18 @@ const SecuritySettingsPage = () => {
       toast.error(`Password must be at least ${settings.min_password_length} characters`);
       return;
     }
-    toast.success('Password changed successfully');
-    setCurrentPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
+    try {
+      await api.post('/auth/change-password', {
+        current_password: currentPassword,
+        new_password: newPassword,
+      });
+      toast.success('Password changed successfully');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to change password');
+    }
   };
 
   const handleRevokeApp = (id) => {

@@ -3,6 +3,7 @@ export const formatCurrency = (amount) => {
 };
 
 export const formatDate = (date) => {
+  if (!date) return 'Never';
   return new Date(date).toLocaleDateString('en-KE', {
     year: 'numeric',
     month: 'short',

@@ -7,7 +7,7 @@ import {
   FaFileInvoice, FaDownload, FaFilter, FaSort
 } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
-import api from '../api/client';
+import { suppliers as suppliersApi } from '../api/endpoints';
 import { formatCurrency } from '../utils/helpers';
 
 const SuppliersPage = () => {
@@ -40,105 +40,8 @@ const SuppliersPage = () => {
   const fetchSuppliers = async () => {
     setLoading(true);
     try {
-      // For MVP, we'll generate supplier data from products
-      // In production, this would call a suppliers API endpoint
-      const productsRes = await api.get('/products/', { params: { limit: 100 } });
-      
-      // Group products by business_id or use sample suppliers
-      const sampleSuppliers = [
-        {
-          id: 1,
-          name: 'Kenya Breweries Limited',
-          contact_name: 'David Mwangi',
-          email: 'david@kenyabreweries.co.ke',
-          phone: '+254 712 345 678',
-          address: 'Enterprise Road',
-          city: 'Nairobi',
-          country: 'Kenya',
-          tax_id: 'KBL-001',
-          payment_terms: '30',
-          status: 'active',
-          notes: 'Main beverage supplier',
-          products: ['Coca Cola', 'Fanta', 'Sprite', 'Stoney'],
-          total_purchases: 1250000,
-          total_orders: 24,
-          last_order: '2026-07-15T10:30:00Z',
-        },
-        {
-          id: 2,
-          name: 'Brookside Dairy',
-          contact_name: 'Jane Wanjiru',
-          email: 'jane@brookside.co.ke',
-          phone: '+254 723 456 789',
-          address: 'Mombasa Road',
-          city: 'Nairobi',
-          country: 'Kenya',
-          tax_id: 'BD-002',
-          payment_terms: '45',
-          status: 'active',
-          notes: 'Dairy products supplier',
-          products: ['Milk', 'Yogurt', 'Butter', 'Cream'],
-          total_purchases: 980000,
-          total_orders: 18,
-          last_order: '2026-07-14T14:45:00Z',
-        },
-        {
-          id: 3,
-          name: 'Bidco Africa',
-          contact_name: 'Peter Ochieng',
-          email: 'peter@bidco.co.ke',
-          phone: '+254 734 567 890',
-          address: 'Industrial Area',
-          city: 'Nairobi',
-          country: 'Kenya',
-          tax_id: 'BA-003',
-          payment_terms: '30',
-          status: 'active',
-          notes: 'Cooking oil and fats supplier',
-          products: ['Cooking Oil', 'Margarine', 'Baking Fat'],
-          total_purchases: 765000,
-          total_orders: 15,
-          last_order: '2026-07-12T09:20:00Z',
-        },
-        {
-          id: 4,
-          name: 'Twiga Foods',
-          contact_name: 'Grace Akinyi',
-          email: 'grace@twiga.co.ke',
-          phone: '+254 745 678 901',
-          address: 'Westlands',
-          city: 'Nairobi',
-          country: 'Kenya',
-          tax_id: 'TF-004',
-          payment_terms: '15',
-          status: 'inactive',
-          notes: 'Fresh produce supplier',
-          products: ['Tomatoes', 'Onions', 'Potatoes', 'Vegetables'],
-          total_purchases: 450000,
-          total_orders: 8,
-          last_order: '2026-06-28T16:30:00Z',
-        },
-        {
-          id: 5,
-          name: 'Kapa Oil Refineries',
-          contact_name: 'Samuel Kiprop',
-          email: 'samuel@kapa.co.ke',
-          phone: '+254 756 789 012',
-          address: 'Lunga Lunga Road',
-          city: 'Nairobi',
-          country: 'Kenya',
-          tax_id: 'KOR-005',
-          payment_terms: '60',
-          status: 'active',
-          notes: 'Edible oils and soaps',
-          products: ['Cooking Oil', 'Soap', 'Detergent'],
-          total_purchases: 340000,
-          total_orders: 10,
-          last_order: '2026-07-10T11:45:00Z',
-        },
-      ];
-      
-      setSuppliers(sampleSuppliers);
+      const response = await suppliersApi.getAll();
+      setSuppliers(response.data);
     } catch (error) {
       console.error('Failed to fetch suppliers:', error);
       toast.error('Failed to load suppliers');
@@ -151,10 +54,11 @@ const SuppliersPage = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      // In production, this would create/update a supplier via API
       if (editingSupplier) {
+        await suppliersApi.update(editingSupplier.id, formData);
         toast.success('Supplier updated successfully');
       } else {
+        await suppliersApi.create(formData);
         toast.success('Supplier created successfully');
       }
       setShowModal(false);
@@ -184,6 +88,7 @@ const SuppliersPage = () => {
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this supplier?')) {
       try {
+        await suppliersApi.delete(id);
         toast.success('Supplier deleted successfully');
         fetchSuppliers();
       } catch (error) {

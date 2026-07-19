@@ -7,7 +7,7 @@ import {
   FaChevronLeft, FaChevronRight, FaUserCircle
 } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
-import api from '../api/client';
+import { customers as customersApi } from '../api/endpoints';
 import { formatCurrency, formatDate } from '../utils/helpers';
 
 const CustomersPage = () => {
@@ -16,6 +16,11 @@ const CustomersPage = () => {
   const [search, setSearch] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [showFormModal, setShowFormModal] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState(null);
+  const [formData, setFormData] = useState({
+    name: '', email: '', phone: '', address: '', status: 'active', notes: '',
+  });
 
   useEffect(() => {
     fetchCustomers();
@@ -24,42 +29,56 @@ const CustomersPage = () => {
   const fetchCustomers = async () => {
     setLoading(true);
     try {
-      // For MVP, we'll generate customer data from sales
-      const salesRes = await api.get('/sales/', { params: { limit: 100 } });
-      
-      // Extract unique customers from sales
-      const customerMap = {};
-      if (salesRes.data && salesRes.data.items) {
-        salesRes.data.items.forEach(sale => {
-          // Since we don't have customer table yet, use cashier as customer
-          const customerId = sale.user_id;
-          if (!customerMap[customerId]) {
-            customerMap[customerId] = {
-              id: customerId,
-              name: sale.cashier_name || 'Unknown Customer',
-              email: `${sale.cashier_name?.toLowerCase().replace(' ', '.') || 'customer'}@example.com`,
-              phone: '+254 712 345 678',
-              total_orders: 0,
-              total_spent: 0,
-              last_order: sale.sale_date,
-              orders: [],
-            };
-          }
-          customerMap[customerId].total_orders += 1;
-          customerMap[customerId].total_spent += sale.total_amount;
-          customerMap[customerId].orders.push(sale);
-          if (sale.sale_date > customerMap[customerId].last_order) {
-            customerMap[customerId].last_order = sale.sale_date;
-          }
-        });
-      }
-      
-      setCustomers(Object.values(customerMap));
+      const response = await customersApi.getAll();
+      setCustomers(response.data);
     } catch (error) {
       console.error('Failed to fetch customers:', error);
       toast.error('Failed to load customers');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const openCustomerForm = (customer = null) => {
+    setEditingCustomer(customer);
+    setFormData(customer ? {
+      name: customer.name || '',
+      email: customer.email || '',
+      phone: customer.phone || '',
+      address: customer.address || '',
+      status: customer.status || 'active',
+      notes: customer.notes || '',
+    } : { name: '', email: '', phone: '', address: '', status: 'active', notes: '' });
+    setShowFormModal(true);
+  };
+
+  const saveCustomer = async (event) => {
+    event.preventDefault();
+    setLoading(true);
+    try {
+      if (editingCustomer) {
+        await customersApi.update(editingCustomer.id, formData);
+      } else {
+        await customersApi.create(formData);
+      }
+      toast.success(`Customer ${editingCustomer ? 'updated' : 'created'} successfully`);
+      setShowFormModal(false);
+      await fetchCustomers();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to save customer');
+      setLoading(false);
+    }
+  };
+
+  const deleteCustomer = async (customer) => {
+    if (!window.confirm(`Delete ${customer.name}?`)) return;
+    try {
+      await customersApi.delete(customer.id);
+      toast.success('Customer deleted successfully');
+      setShowModal(false);
+      fetchCustomers();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to delete customer');
     }
   };
 
@@ -95,7 +114,7 @@ const CustomersPage = () => {
           </h1>
           <p className="text-gray-500 text-sm mt-1">Manage your customer relationships</p>
         </div>
-        <button className="btn-primary flex items-center gap-2">
+        <button onClick={() => openCustomerForm()} className="btn-primary flex items-center gap-2">
           <FaUserPlus /> Add Customer
         </button>
       </div>
@@ -182,12 +201,11 @@ const CustomersPage = () => {
           >
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold text-gray-800">Customer Details</h2>
-              <button
-                onClick={() => setShowModal(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                ✕
-              </button>
+              <div className="flex items-center gap-2">
+                <button onClick={() => { setShowModal(false); openCustomerForm(selectedCustomer); }} className="p-2 text-blue-500"><FaEdit /></button>
+                <button onClick={() => deleteCustomer(selectedCustomer)} className="p-2 text-red-500"><FaTrash /></button>
+                <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+              </div>
             </div>
 
             <div className="flex items-center gap-4 mb-6 pb-4 border-b border-gray-100">
@@ -234,6 +252,45 @@ const CustomersPage = () => {
                 </div>
               ))}
             </div>
+          </motion.div>
+        </div>
+      )}
+
+      {showFormModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-white rounded-xl max-w-lg w-full p-6 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-800">{editingCustomer ? 'Edit Customer' : 'Add Customer'}</h2>
+              <button onClick={() => setShowFormModal(false)} className="text-gray-400">✕</button>
+            </div>
+            <form onSubmit={saveCustomer} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {[
+                ['name', 'Name', 'text'],
+                ['email', 'Email', 'email'],
+                ['phone', 'Phone', 'tel'],
+                ['address', 'Address', 'text'],
+              ].map(([key, label, type]) => (
+                <div key={key} className={key === 'address' ? 'sm:col-span-2' : ''}>
+                  <label className="label-primary">{label}</label>
+                  <input type={type} value={formData[key]} onChange={(e) => setFormData({ ...formData, [key]: e.target.value })} className="input-primary" required={key === 'name'} />
+                </div>
+              ))}
+              <div>
+                <label className="label-primary">Status</label>
+                <select value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })} className="input-primary">
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+              <div className="sm:col-span-2">
+                <label className="label-primary">Notes</label>
+                <textarea value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} className="input-primary" rows="3" />
+              </div>
+              <div className="sm:col-span-2 flex gap-3">
+                <button disabled={loading} className="btn-primary flex-1">{loading ? 'Saving...' : 'Save Customer'}</button>
+                <button type="button" onClick={() => setShowFormModal(false)} className="btn-secondary">Cancel</button>
+              </div>
+            </form>
           </motion.div>
         </div>
       )}

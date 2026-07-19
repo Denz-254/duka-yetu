@@ -149,7 +149,7 @@ jobs:
         id: meta-backend
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend
           tags: |
             type=ref,event=branch
             type=sha,format=short,prefix=sha-
@@ -188,22 +188,13 @@ jobs:
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
-          password: ${{ secrets.GHCR_TOKEN }}
-
-      - name: Debug - Check Frontend Files
-        run: |
-          echo "=== Checking frontend files ==="
-          ls -la frontend/
-          echo "=== Checking Dockerfile ==="
-          cat frontend/Dockerfile || echo "Dockerfile not found"
-          echo "=== Checking package.json ==="
-          cat frontend/package.json || echo "package.json not found"
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Extract metadata for Frontend
         id: meta-frontend
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend
           tags: |
             type=ref,event=branch
             type=sha,format=short,prefix=sha-
@@ -214,13 +205,13 @@ jobs:
       - name: Build and push Frontend image
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ./frontend
           push: true
           tags: ${{ steps.meta-frontend.outputs.tags }}
           labels: ${{ steps.meta-frontend.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          file: frontend/Dockerfile
+          file: ./frontend/Dockerfile
           platforms: linux/amd64
           provenance: false
           sbom: false
