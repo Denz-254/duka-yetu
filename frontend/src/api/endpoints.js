@@ -12,6 +12,8 @@ export const products = {
   update: (id, data) => api.put(`/products/${id}`, data),
   delete: (id) => api.delete(`/products/${id}`),
   lowStock: () => api.get('/products/alerts/low-stock'),
+  feature: (id, data) => api.post(`/products/${id}/feature`, data, { timeout: 45000 }),
+  featureStatus: (id, paymentId) => api.get(`/products/${id}/feature-status/${paymentId}`),
 };
 
 export const sales = {
@@ -87,4 +89,9 @@ export const subscription = {
   }, { timeout: 45000 }),
   mpesaStatus: (paymentId) => api.get(`/subscription/mpesa-status/${paymentId}`),
   portal: () => api.post('/subscription/portal'),
+  invoices: () => api.get('/subscription/invoices'),
+  requestInvoice: () => api.post('/subscription/request-invoice'),
+  downloadInvoice: (paymentId) => api.get(`/subscription/invoices/${paymentId}`, {
+    responseType: 'blob',
+  }),
 };

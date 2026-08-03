@@ -71,11 +71,16 @@ function App() {
       <Toaster
         position="top-right"
         toastOptions={{
-          duration: 4000,
+          duration: 2800,
           style: {
-            background: '#363636',
+            background: '#1f2937',
             color: '#fff',
+            fontSize: '13px',
+            maxWidth: '280px',
+            padding: '10px 14px',
           },
+          success: { duration: 2200 },
+          error: { duration: 3200 },
         }}
       />
       <Routes>

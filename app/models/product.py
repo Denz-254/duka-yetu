@@ -24,6 +24,9 @@ class Product(Base):
     description = Column(String(500))
     image_url = Column(String(500))
     is_active = Column(Boolean, default=True, nullable=False)
+    is_featured = Column(Boolean, default=False, nullable=False)
+    featured_until = Column(DateTime, nullable=True)
+    featured_badge = Column(String(50), nullable=True)  # e.g. "Save 30%"
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     

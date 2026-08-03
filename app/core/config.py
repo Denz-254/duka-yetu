@@ -77,6 +77,15 @@ class Settings(BaseSettings):
     # Marketplace commission percent taken from online orders
     MARKETPLACE_COMMISSION_PERCENT: float = Field(default=5.0)
 
+    # Featured product hero placement (platform fee paid via M-Pesa)
+    FEATURE_PRODUCT_FEE_KES: int = Field(default=500)
+    FEATURE_PRODUCT_DAYS: int = Field(default=7)
+
+    # Resend transactional email
+    RESEND_API_KEY: str = Field(default="")
+    RESEND_FROM_EMAIL: str = Field(default="Duka Yetu <onboarding@resend.dev>")
+    PLATFORM_NOTIFY_EMAIL: str = Field(default="")
+
     # Platform subscription prices in KES (paid to platform M-Pesa)
     PLAN_BASIC_MONTHLY_KES: int = Field(default=2500)
     PLAN_BASIC_YEARLY_KES: int = Field(default=25000)

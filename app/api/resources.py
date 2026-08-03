@@ -62,9 +62,26 @@ def list_categories(
     user: User = Depends(get_current_user),
     _access: Business = Depends(require_feature("inventory")),
 ):
-    return db.query(Category).filter(
-        Category.business_id == user.business_id, Category.is_active == True
+    from app.models.product import Product
+
+    rows = db.query(Category).filter(
+        Category.business_id == user.business_id, Category.is_active == True  # noqa: E712
     ).order_by(Category.name).all()
+    result = []
+    for cat in rows:
+        count = (
+            db.query(Product)
+            .filter(
+                Product.category_id == cat.id,
+                Product.business_id == user.business_id,
+                Product.is_active == True,  # noqa: E712
+            )
+            .count()
+        )
+        data = CategoryResponse.model_validate(cat)
+        data.count = count
+        result.append(data)
+    return result
 
 
 @router.post("/categories/", response_model=CategoryResponse, status_code=201)

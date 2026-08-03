@@ -355,3 +355,97 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
             db.commit()
 
     return {"received": True}
+
+
+@router.get("/invoices")
+async def list_invoices(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_owner),
+    business: Business = Depends(get_current_business),
+):
+    """Billing history from completed M-Pesa subscription payments."""
+    rows = (
+        db.query(MpesaTransaction)
+        .filter(
+            MpesaTransaction.business_id == business.id,
+            MpesaTransaction.source == "SUBSCRIPTION",
+            MpesaTransaction.status == "COMPLETED",
+        )
+        .order_by(MpesaTransaction.completed_at.desc())
+        .limit(50)
+        .all()
+    )
+    items = []
+    for pay in rows:
+        snap = pay.cart_snapshot or {}
+        items.append(
+            {
+                "id": str(pay.id),
+                "date": (pay.completed_at or pay.created_at).isoformat() if (pay.completed_at or pay.created_at) else None,
+                "description": f"{snap.get('plan', 'Plan')} · {snap.get('billing_cycle', 'monthly')}",
+                "amount": float(pay.amount),
+                "status": "PAID",
+                "mpesa_receipt": pay.mpesa_receipt_number,
+                "payment_method": "MPESA",
+            }
+        )
+    return {"items": items}
+
+
+@router.get("/invoices/{payment_id}")
+async def download_invoice(
+    payment_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_owner),
+    business: Business = Depends(get_current_business),
+):
+    """Download HTML invoice for an M-Pesa subscription payment."""
+    from fastapi.responses import HTMLResponse
+
+    from app.utils.invoice_generator import generate_subscription_invoice_html
+
+    payment = db.query(MpesaTransaction).filter(
+        MpesaTransaction.id == payment_id,
+        MpesaTransaction.business_id == business.id,
+        MpesaTransaction.source == "SUBSCRIPTION",
+        MpesaTransaction.status == "COMPLETED",
+    ).first()
+    if not payment:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    html = generate_subscription_invoice_html(payment, business)
+    return HTMLResponse(
+        content=html,
+        headers={
+            "Content-Disposition": f'attachment; filename="invoice-{str(payment.id)[:8]}.html"'
+        },
+    )
+
+
+@router.post("/request-invoice")
+async def request_latest_invoice(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_owner),
+    business: Business = Depends(get_current_business),
+):
+    """Return the latest M-Pesa subscription invoice for download."""
+    payment = (
+        db.query(MpesaTransaction)
+        .filter(
+            MpesaTransaction.business_id == business.id,
+            MpesaTransaction.source == "SUBSCRIPTION",
+            MpesaTransaction.status == "COMPLETED",
+        )
+        .order_by(MpesaTransaction.completed_at.desc())
+        .first()
+    )
+    if not payment:
+        raise HTTPException(
+            status_code=404,
+            detail="No M-Pesa payments yet. Pay a plan first.",
+        )
+    return {
+        "payment_id": str(payment.id),
+        "download_url": f"/api/v1/subscription/invoices/{payment.id}",
+        "amount": float(payment.amount),
+        "mpesa_receipt": payment.mpesa_receipt_number,
+    }

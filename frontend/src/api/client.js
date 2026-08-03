@@ -6,8 +6,6 @@ import axios from 'axios';
  * proxy forwards to the backend — avoids CORS + github.dev → app.github.dev redirects.
  */
 const getApiUrl = () => {
-  // Same-origin via Vite proxy in DEV (localhost + Codespaces).
-  // Do this first so a stale VITE_API_URL pointing at *.github.dev cannot break CORS.
   if (import.meta.env.DEV) {
     return '/api/v1';
   }
@@ -16,7 +14,6 @@ const getApiUrl = () => {
     return import.meta.env.VITE_API_URL.replace(/\/$/, '');
   }
 
-  // Browser on Codespaces production preview: mirror the frontend forwarded hostname
   if (typeof window !== 'undefined') {
     const host = window.location.hostname;
     const match = host.match(/^(.*?)-(\d+)\.(.+)$/);
@@ -39,8 +36,6 @@ const getApiUrl = () => {
 
 const API_BASE = getApiUrl();
 
-console.log('🔗 API URL:', API_BASE);
-
 const api = axios.create({
   baseURL: API_BASE,
   headers: {
@@ -60,10 +55,28 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    console.error('API Error:', error.config?.url, error.response?.status, error.message);
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
-      window.location.href = '/login';
+      try {
+        // Clear zustand auth without full page reload
+        const raw = localStorage.getItem('auth-storage');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed?.state) {
+            parsed.state.user = null;
+            parsed.state.business = null;
+            parsed.state.token = null;
+            parsed.state.isAuthenticated = false;
+            localStorage.setItem('auth-storage', JSON.stringify(parsed));
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+      if (!window.location.pathname.includes('/login')) {
+        window.history.pushState({}, '', '/login');
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      }
     }
     return Promise.reject(error);
   }

@@ -22,7 +22,7 @@ const LoginPage = () => {
         return;
       }
       if (result.business?.approval_status && result.business.approval_status !== 'APPROVED') {
-        toast(result.message || 'Awaiting platform approval', { icon: '⏳' });
+        toast(result.message || 'Awaiting approval');
         navigate('/pending-approval');
         return;
       }

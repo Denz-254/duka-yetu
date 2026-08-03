@@ -2,7 +2,7 @@
 
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, DateTime, Boolean, ForeignKey, Uuid
+from sqlalchemy import Column, String, DateTime, Boolean, ForeignKey, Integer, Uuid
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
@@ -23,6 +23,8 @@ class User(Base):
     role = Column(String(50), default="CASHIER", nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
     login_time = Column(DateTime)
+    failed_login_attempts = Column(Integer, default=0, nullable=False)
+    locked_until = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     # branch_id - for multi-branch support (optional)

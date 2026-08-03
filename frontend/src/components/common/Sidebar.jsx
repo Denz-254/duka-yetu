@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   FaStore, 
@@ -31,6 +31,7 @@ import useSubscriptionStore from '../../store/subscriptionStore';
 
 const Sidebar = ({ isOpen, toggleSidebar }) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
   const subscriptionActive = useSubscriptionStore((state) => state.active);
@@ -79,7 +80,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
   const handleLogout = () => {
     clearSubscription();
     logout();
-    window.location.href = '/login';
+    navigate('/login', { replace: true });
   };
 
   return (

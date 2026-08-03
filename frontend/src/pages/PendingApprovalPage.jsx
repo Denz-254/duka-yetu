@@ -1,10 +1,12 @@
 import { FaHourglassHalf, FaSignOutAlt, FaStore } from 'react-icons/fa';
+import { useNavigate } from 'react-router-dom';
 import useAuthStore from '../store/authStore';
 
 const PendingApprovalPage = () => {
   const user = useAuthStore((state) => state.user);
   const business = useAuthStore((state) => state.business);
   const logout = useAuthStore((state) => state.logout);
+  const navigate = useNavigate();
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 to-orange-100 px-4">
@@ -19,7 +21,7 @@ const PendingApprovalPage = () => {
         </p>
         <p className="text-gray-500 text-sm mt-3">
           A Duka Yetu super admin must approve your account before you can use POS, inventory,
-          and other paid features. This prevents free abuse via multiple emails.
+          and other paid features.
         </p>
         <div className="mt-6 p-4 rounded-xl bg-gray-50 text-left text-sm text-gray-600">
           <p className="flex items-center gap-2 font-medium text-gray-800">
@@ -34,7 +36,7 @@ const PendingApprovalPage = () => {
         <button
           onClick={() => {
             logout();
-            window.location.href = '/login';
+            navigate('/login', { replace: true });
           }}
           className="btn-primary mt-6 inline-flex items-center gap-2"
         >

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { FaPlus, FaSearch, FaEdit, FaTrash, FaUserPlus, FaUserMinus, FaKey, FaTimes } from 'react-icons/fa';
+import { FaPlus, FaSearch, FaEdit, FaTrash, FaUserPlus, FaUserMinus, FaKey, FaTimes, FaLock } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
 import useAuthStore from '../store/authStore';
 import api from '../api/client';
@@ -118,7 +118,7 @@ const StaffPage = () => {
   if (!isOwner) {
     return (
       <div className="text-center py-12">
-        <div className="text-6xl mb-4">🔒</div>
+        <div className="text-6xl mb-4 text-gray-300 flex justify-center"><FaLock /></div>
         <h2 className="text-2xl font-bold text-gray-800">Access Denied</h2>
         <p className="text-gray-500 mt-2">Only owners can manage staff</p>
       </div>

@@ -230,7 +230,7 @@ const POSPage = () => {
 
             {filteredProducts.length === 0 && !loading && (
               <div className="text-center py-12 text-gray-500">
-                <div className="text-6xl mb-4">🔍</div>
+                <div className="text-6xl mb-4 text-gray-300 flex justify-center"><FaSearch /></div>
                 <p>No products found</p>
                 <p className="text-sm text-gray-400 mt-1">Try adjusting your search</p>
               </div>
@@ -312,7 +312,7 @@ const POSPage = () => {
 
             {items.length === 0 && (
               <div className="text-center py-12 text-gray-400">
-                <div className="text-6xl mb-4">🛒</div>
+                <div className="text-6xl mb-4 text-gray-300 flex justify-center"><FaShoppingCart /></div>
                 <p>Cart is empty</p>
                 <p className="text-sm mt-1">Add products to start selling</p>
               </div>
@@ -382,7 +382,7 @@ const POSPage = () => {
                   >
                     {loading ? (
                       <span className="flex items-center gap-2">
-                        <span className="animate-spin">⏳</span>
+                        <FaMobileAlt className="animate-pulse" />
                         {paymentMethod === 'MPESA' ? 'Waiting for M-Pesa...' : 'Processing...'}
                       </span>
                     ) : (

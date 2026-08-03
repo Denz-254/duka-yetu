@@ -307,10 +307,18 @@ async def mpesa_callback(request: Request, db: Session = Depends(get_db)):
             payment.phone_number = str(parsed["phone_number"])
         try:
             if payment.source == "MARKETPLACE":
-                _complete_marketplace_order(db, payment)
+                order = _complete_marketplace_order(db, payment)
+                try:
+                    from app.services.email import send_order_paid_emails
+                    business = db.query(Business).filter(Business.id == order.business_id).first()
+                    await send_order_paid_emails(order, business)
+                except Exception:  # noqa: BLE001
+                    pass
             elif payment.source == "SUBSCRIPTION":
                 from app.api.subscription import activate_subscription_from_payment
                 activate_subscription_from_payment(db, payment)
+            elif payment.source == "FEATURE":
+                _complete_feature_product(db, payment)
             else:
                 _complete_sale_from_payment(db, payment)
         except Exception as exc:  # noqa: BLE001
@@ -330,6 +338,31 @@ async def mpesa_callback(request: Request, db: Session = Depends(get_db)):
         db.commit()
 
     return {"ResultCode": 0, "ResultDesc": "Accepted"}
+
+
+def _complete_feature_product(db: Session, payment: MpesaTransaction) -> Product:
+    """Activate featured placement after M-Pesa feature fee is paid."""
+    from datetime import timedelta
+
+    snap = payment.cart_snapshot or {}
+    product_id = snap.get("product_id")
+    days = int(snap.get("days") or settings.FEATURE_PRODUCT_DAYS)
+    badge = (snap.get("badge_text") or "Featured")[:50]
+    if not product_id:
+        raise HTTPException(status_code=400, detail="Missing product for featured payment")
+
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found for featured payment")
+
+    product.is_featured = True
+    product.featured_until = datetime.utcnow() + timedelta(days=days)
+    product.featured_badge = badge
+    payment.status = "COMPLETED"
+    payment.completed_at = datetime.utcnow()
+    db.commit()
+    db.refresh(product)
+    return product
 
 
 def _complete_marketplace_order(db: Session, payment: MpesaTransaction) -> OnlineOrder:

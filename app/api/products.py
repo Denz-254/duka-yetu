@@ -1,24 +1,45 @@
 """Product routes for Duka Yetu."""
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.orm import Session
-from sqlalchemy import or_
+from datetime import datetime
+from decimal import Decimal
 from typing import Optional
 from uuid import UUID
 
+from fastapi import APIRouter, Depends, HTTPException, status, Query
+from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
+from sqlalchemy import or_
+
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.dependencies import get_current_user, require_owner
 from app.models.user import User
 from app.models.product import Product
 from app.models.resources import Category
+from app.models.mpesa_transaction import MpesaTransaction
 from app.schemas.product import (
     ProductCreate,
     ProductUpdate,
     ProductResponse,
     ProductListResponse,
 )
+from app.services.mpesa import MpesaError, initiate_stk_push, resolve_platform_credentials
 
 router = APIRouter()
+
+
+class FeatureProductRequest(BaseModel):
+    phone_number: str = Field(..., min_length=9, max_length=30)
+    badge_text: Optional[str] = Field(None, max_length=50)
+
+
+class FeatureProductResponse(BaseModel):
+    payment_id: str
+    product_id: str
+    amount: float
+    status: str
+    customer_message: str
+    days: int
 
 
 def _validate_category(db: Session, business_id, category_id: Optional[str]):
@@ -39,7 +60,11 @@ def _product_response(product: Product) -> ProductResponse:
     data.category_name = product.category.name if product.category else None
     if product.category_id:
         data.category_id = str(product.category_id)
+    data.is_featured = bool(getattr(product, "is_featured", False))
+    data.featured_until = getattr(product, "featured_until", None)
+    data.featured_badge = getattr(product, "featured_badge", None)
     return data
+
 
 @router.post("/", response_model=ProductResponse, status_code=status.HTTP_201_CREATED)
 async def create_product(
@@ -47,24 +72,17 @@ async def create_product(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_owner),
 ):
-    """
-    Create a new product.
-    
-    Only OWNER can create products.
-    """
-    # Check if product with same SKU exists for this business
     existing_product = db.query(Product).filter(
         Product.business_id == current_user.business_id,
         Product.sku == product_data.sku
     ).first()
-    
+
     if existing_product:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Product with SKU '{product_data.sku}' already exists"
         )
-    
-    # Create product
+
     product = Product(
         business_id=current_user.business_id,
         category_id=_validate_category(db, current_user.business_id, product_data.category_id),
@@ -77,12 +95,13 @@ async def create_product(
         image_url=product_data.image_url,
         is_active=True,
     )
-    
+
     db.add(product)
     db.commit()
     db.refresh(product)
-    
+
     return _product_response(product)
+
 
 @router.get("/", response_model=ProductListResponse)
 async def list_products(
@@ -93,18 +112,11 @@ async def list_products(
     search: Optional[str] = Query(None, min_length=1),
     category_id: Optional[str] = Query(None),
 ):
-    """
-    List all products for the current business.
-    
-    Both OWNER and CASHIER can view products.
-    """
-    # Base query
     query = db.query(Product).filter(
         Product.business_id == current_user.business_id,
         Product.is_active == True  # noqa: E712
     )
-    
-    # Search filter
+
     if search:
         query = query.filter(
             or_(
@@ -116,13 +128,10 @@ async def list_products(
 
     if category_id:
         query = query.filter(Product.category_id == category_id)
-    
-    # Get total count
+
     total = query.count()
-    
-    # Pagination
     products = query.offset(skip).limit(limit).all()
-    
+
     return ProductListResponse(
         items=[_product_response(p) for p in products],
         total=total,
@@ -131,27 +140,148 @@ async def list_products(
         per_page=limit,
     )
 
+
+@router.get("/alerts/low-stock", response_model=list[ProductResponse])
+async def get_low_stock_products(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_owner),
+):
+    threshold = 10
+    products = db.query(Product).filter(
+        Product.business_id == current_user.business_id,
+        Product.is_active == True,  # noqa: E712
+        Product.stock_quantity < threshold
+    ).all()
+    return [_product_response(p) for p in products]
+
+
+@router.post("/{product_id}/feature", response_model=FeatureProductResponse, status_code=201)
+async def feature_product(
+    product_id: UUID,
+    payload: FeatureProductRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_owner),
+):
+    """Pay a platform fee via M-Pesa to feature a product on the store hero."""
+    product = db.query(Product).filter(
+        Product.id == product_id,
+        Product.business_id == current_user.business_id,
+        Product.is_active == True,  # noqa: E712
+    ).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    fee = int(settings.FEATURE_PRODUCT_FEE_KES)
+    days = int(settings.FEATURE_PRODUCT_DAYS)
+    if fee < 1:
+        raise HTTPException(status_code=503, detail="Feature fee is not configured")
+
+    try:
+        credentials = resolve_platform_credentials()
+    except MpesaError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    payment = MpesaTransaction(
+        business_id=current_user.business_id,
+        user_id=current_user.id,
+        phone_number=payload.phone_number,
+        amount=Decimal(fee),
+        account_reference=f"FT-{str(product.id)[:8]}"[:12],
+        description="Feature product",
+        status="PENDING",
+        source="FEATURE",
+        cart_snapshot={
+            "product_id": str(product.id),
+            "badge_text": (payload.badge_text or "Featured").strip()[:50],
+            "days": days,
+            "amount": fee,
+        },
+    )
+    db.add(payment)
+    db.commit()
+    db.refresh(payment)
+
+    base = (settings.MPESA_CALLBACK_BASE_URL or settings.API_BASE_URL or "").rstrip("/")
+    if not base:
+        raise HTTPException(status_code=500, detail="MPESA_CALLBACK_BASE_URL is not configured")
+
+    try:
+        result = await initiate_stk_push(
+            credentials=credentials,
+            phone_number=payload.phone_number,
+            amount=fee,
+            account_reference=payment.account_reference,
+            transaction_desc="Feature Product",
+            callback_url=f"{base}/api/v1/payments/mpesa/callback",
+        )
+    except MpesaError as exc:
+        payment.status = "FAILED"
+        payment.result_desc = str(exc)
+        db.commit()
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    payment.phone_number = result["phone_number"]
+    payment.merchant_request_id = result.get("merchant_request_id")
+    payment.checkout_request_id = result.get("checkout_request_id")
+    payment.result_desc = result.get("customer_message")
+    db.commit()
+
+    return FeatureProductResponse(
+        payment_id=str(payment.id),
+        product_id=str(product.id),
+        amount=float(fee),
+        status=payment.status,
+        customer_message=payment.result_desc or "Check your phone to enter M-Pesa PIN",
+        days=days,
+    )
+
+
+@router.get("/{product_id}/feature-status/{payment_id}")
+async def feature_payment_status(
+    product_id: UUID,
+    payment_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_owner),
+):
+    payment = db.query(MpesaTransaction).filter(
+        MpesaTransaction.id == payment_id,
+        MpesaTransaction.business_id == current_user.business_id,
+        MpesaTransaction.source == "FEATURE",
+    ).first()
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    product = db.query(Product).filter(
+        Product.id == product_id,
+        Product.business_id == current_user.business_id,
+    ).first()
+    return {
+        "payment_id": str(payment.id),
+        "status": payment.status,
+        "result_desc": payment.result_desc,
+        "is_featured": bool(product and product.is_featured),
+        "featured_until": product.featured_until if product else None,
+    }
+
+
 @router.get("/{product_id}", response_model=ProductResponse)
 async def get_product(
     product_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """
-    Get a single product by ID.
-    """
     product = db.query(Product).filter(
         Product.id == product_id,
         Product.business_id == current_user.business_id
     ).first()
-    
+
     if not product:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Product not found"
         )
-    
+
     return _product_response(product)
+
 
 @router.put("/{product_id}", response_model=ProductResponse)
 async def update_product(
@@ -160,22 +290,17 @@ async def update_product(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_owner),
 ):
-    """
-    Update a product.
-    
-    Only OWNER can update products.
-    """
     product = db.query(Product).filter(
         Product.id == product_id,
         Product.business_id == current_user.business_id
     ).first()
-    
+
     if not product:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Product not found"
         )
-    
+
     update_data = product_data.dict(exclude_unset=True)
     if "category_id" in update_data:
         update_data["category_id"] = _validate_category(
@@ -183,11 +308,12 @@ async def update_product(
         )
     for field, value in update_data.items():
         setattr(product, field, value)
-    
+
     db.commit()
     db.refresh(product)
-    
+
     return _product_response(product)
+
 
 @router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_product(
@@ -195,43 +321,17 @@ async def delete_product(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_owner),
 ):
-    """
-    Delete a product (soft delete).
-    
-    Only OWNER can delete products.
-    """
     product = db.query(Product).filter(
         Product.id == product_id,
         Product.business_id == current_user.business_id
     ).first()
-    
+
     if not product:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Product not found"
         )
-    
-    # Soft delete
+
     product.is_active = False
     db.commit()
-    
     return None
-
-@router.get("/alerts/low-stock", response_model=list[ProductResponse])
-async def get_low_stock_products(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_owner),
-):
-    """
-    Get products with low stock.
-    
-    Only OWNER can view low stock alerts.
-    """
-    threshold = 10  # Default threshold
-    products = db.query(Product).filter(
-        Product.business_id == current_user.business_id,
-        Product.is_active == True,  # noqa: E712
-        Product.stock_quantity < threshold
-    ).all()
-    
-    return [_product_response(p) for p in products]

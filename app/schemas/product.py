@@ -85,6 +85,9 @@ class ProductResponse(ProductBase):
     id: str
     is_active: bool
     category_name: Optional[str] = None
+    is_featured: bool = False
+    featured_until: Optional[datetime] = None
+    featured_badge: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     

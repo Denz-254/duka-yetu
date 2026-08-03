@@ -30,7 +30,7 @@ const CategoriesPage = () => {
       setCategories(response.data);
     } catch (error) {
       console.error('Failed to fetch categories:', error);
-      toast.error('Failed to load categories');
+      toast.error('Load failed');
     } finally {
       setLoading(false);
     }
@@ -42,30 +42,30 @@ const CategoriesPage = () => {
     try {
       if (editingCategory) {
         await categoriesApi.update(editingCategory.id, formData);
-        toast.success('Category updated successfully');
+        toast.success('Category updated');
       } else {
         await categoriesApi.create(formData);
-        toast.success('Category created successfully');
+        toast.success('Category created');
       }
       setShowModal(false);
       setEditingCategory(null);
       setFormData({ name: '', description: '', color: '#059669' });
       fetchCategories();
     } catch (error) {
-      toast.error('Failed to save category');
+      toast.error('Save failed');
     } finally {
       setLoading(false);
     }
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this category?')) {
+    if (window.confirm('Delete this category?')) {
       try {
         await categoriesApi.delete(id);
-        toast.success('Category deleted successfully');
+        toast.success('Category deleted');
         fetchCategories();
       } catch (error) {
-        toast.error('Failed to delete category');
+        toast.error('Delete failed');
       }
     }
   };
@@ -131,7 +131,9 @@ const CategoriesPage = () => {
                   </div>
                   <div>
                     <h3 className="font-semibold text-gray-800">{category.name}</h3>
-                    <p className="text-sm text-gray-500">{category.count} products</p>
+                    <p className="text-sm text-gray-500">
+                      {category.count ?? 0} {category.count === 1 ? 'product' : 'products'}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-1">

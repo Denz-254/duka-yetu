@@ -97,7 +97,7 @@ const SubscriptionPage = () => {
     },
   ];
 
-  const billingHistory = [];
+  const [billingHistory, setBillingHistory] = useState([]);
 
   useEffect(() => {
     subscriptionApi.get()
@@ -112,7 +112,11 @@ const SubscriptionPage = () => {
           max_branches: data.limits.branches ?? 'Unlimited',
         });
       })
-      .catch((error) => toast.error(error.response?.data?.detail || 'Failed to load subscription'));
+      .catch((error) => toast.error(error.response?.data?.detail || 'Load failed'));
+
+    subscriptionApi.invoices()
+      .then(({ data }) => setBillingHistory(data.items || []))
+      .catch(() => setBillingHistory([]));
   }, []);
 
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -124,18 +128,18 @@ const SubscriptionPage = () => {
   const handleMpesaPay = async () => {
     if (!payPlanId) return;
     if (!mpesaPhone.trim()) {
-      toast.error('Enter the M-Pesa phone number that will pay');
+      toast.error('Enter M-Pesa phone');
       return;
     }
     setLoading(true);
-    setMpesaStatus('Sending STK Push to pay your subscription...');
+    setMpesaStatus('Sending STK Push...');
     try {
       const { data } = await subscriptionApi.mpesaCheckout(payPlanId, billingCycle, mpesaPhone.trim());
-      toast.success(data.customer_message || 'STK Push sent');
+      toast.success('Check phone for PIN');
       for (let i = 0; i < 40; i += 1) {
         const { data: status } = await subscriptionApi.mpesaStatus(data.payment_id);
         if (status.status === 'COMPLETED') {
-          toast.success('Subscription activated!');
+          toast.success('Subscription active');
           setPayPlanId(null);
           setMpesaPhone('');
           setMpesaStatus('');
@@ -143,17 +147,19 @@ const SubscriptionPage = () => {
           setCurrentPlan(refreshed.data.plan.toLowerCase());
           setSubscriptionStatus(refreshed.data.status);
           setCurrentPeriodEnd(refreshed.data.current_period_end || refreshed.data.trial_ends_at);
+          const inv = await subscriptionApi.invoices();
+          setBillingHistory(inv.data.items || []);
           return;
         }
         if (status.status === 'FAILED') {
           throw new Error(status.result_desc || 'Payment failed');
         }
-        setMpesaStatus('Waiting for M-Pesa PIN confirmation...');
+        setMpesaStatus('Waiting for M-Pesa PIN...');
         await sleep(3000);
       }
-      throw new Error('Timed out waiting for payment');
+      throw new Error('Payment timed out');
     } catch (error) {
-      toast.error(error.response?.data?.detail || error.message || 'M-Pesa payment failed');
+      toast.error(error.response?.data?.detail || error.message || 'M-Pesa failed');
       setMpesaStatus('');
     } finally {
       setLoading(false);
@@ -177,7 +183,35 @@ const SubscriptionPage = () => {
       const { data } = await subscriptionApi.portal();
       window.location.assign(data.portal_url);
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Unable to open billing portal');
+      toast.error(error.response?.data?.detail || 'Portal unavailable');
+      setLoading(false);
+    }
+  };
+
+  const downloadInvoiceHtml = async (paymentId) => {
+    try {
+      const { data } = await subscriptionApi.downloadInvoice(paymentId);
+      const blob = new Blob([data], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `invoice-${paymentId.slice(0, 8)}.html`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success('Invoice downloaded');
+    } catch {
+      toast.error('Download failed');
+    }
+  };
+
+  const requestInvoice = async () => {
+    setLoading(true);
+    try {
+      const { data } = await subscriptionApi.requestInvoice();
+      await downloadInvoiceHtml(data.payment_id);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'No invoice yet');
+    } finally {
       setLoading(false);
     }
   };
@@ -414,11 +448,13 @@ const SubscriptionPage = () => {
             </thead>
             <tbody>
               {billingHistory.length === 0 && (
-                <tr><td colSpan="5" className="py-8 text-center text-sm text-gray-500">Invoices are available in the secure billing portal.</td></tr>
+                <tr><td colSpan="5" className="py-8 text-center text-sm text-gray-500">No M-Pesa invoices yet. Pay a plan to generate one.</td></tr>
               )}
               {billingHistory.map((bill) => (
                 <tr key={bill.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                  <td className="py-3 px-4 text-sm text-gray-600">{bill.date}</td>
+                  <td className="py-3 px-4 text-sm text-gray-600">
+                    {bill.date ? new Date(bill.date).toLocaleDateString('en-KE') : '—'}
+                  </td>
                   <td className="py-3 px-4 text-sm text-gray-600">{bill.description}</td>
                   <td className="py-3 px-4 text-sm font-semibold text-gray-800 text-right">
                     KSh {bill.amount}
@@ -429,7 +465,13 @@ const SubscriptionPage = () => {
                     </span>
                   </td>
                   <td className="py-3 px-4 text-right">
-                    <button className="text-primary-600 hover:text-primary-700 text-sm">Download</button>
+                    <button
+                      type="button"
+                      onClick={() => downloadInvoiceHtml(bill.id)}
+                      className="text-primary-600 hover:text-primary-700 text-sm"
+                    >
+                      Download
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -447,7 +489,8 @@ const SubscriptionPage = () => {
           <FaCreditCard /> Update Payment Method
         </button>
         <button
-          onClick={openBillingPortal}
+          onClick={requestInvoice}
+          disabled={loading}
           className="btn-secondary flex items-center gap-2"
         >
           <FaFileInvoice /> Request Invoice

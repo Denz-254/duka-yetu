@@ -141,31 +141,60 @@ async def login(
     """
     Login with username and password.
     """
-    # Find user by username
     user = db.query(User).filter(User.username == request.username).first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid username or password",
+            detail="Invalid credentials",
         )
-    
-    # Verify password
+
+    # Account lockout from business security settings (or defaults)
+    now = datetime.utcnow()
+    if user.locked_until and user.locked_until > now:
+        remaining = int((user.locked_until - now).total_seconds() // 60) + 1
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Account locked. Try again in {remaining} min",
+        )
+
+    security = {}
+    if user.business_id:
+        biz = db.query(Business).filter(Business.id == user.business_id).first()
+        if biz:
+            security = (biz.settings or {}).get("security") or {}
+    max_attempts = int(security.get("max_login_attempts") or 5)
+    lockout_mins = int(security.get("lockout_duration_minutes") or 30)
+
     if not verify_password(request.password, user.password_hash):
+        attempts = int(user.failed_login_attempts or 0) + 1
+        user.failed_login_attempts = attempts
+        if attempts >= max_attempts:
+            user.locked_until = now + timedelta(minutes=lockout_mins)
+            user.failed_login_attempts = 0
+            db.commit()
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Too many attempts. Locked {lockout_mins} min",
+            )
+        db.commit()
+        left = max_attempts - attempts
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid username or password",
+            detail=f"Invalid credentials ({left} left)",
         )
+
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="This user account is disabled.",
+            detail="Account disabled",
         )
-    
-    # Update login time
-    user.login_time = datetime.utcnow()
+
+    user.login_time = now
+    user.failed_login_attempts = 0
+    user.locked_until = None
     db.commit()
     db.refresh(user)
-    
+
     # Super admin has no store business
     if user.role == "SUPER_ADMIN":
         token_data = {
@@ -204,7 +233,7 @@ async def login(
     if not business.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="This business account is disabled.",
+            detail="Business disabled",
         )
 
     approval = business.approval_status or "PENDING"
@@ -212,10 +241,9 @@ async def login(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=business.rejection_reason
-            or "Your business registration was rejected. Contact support.",
+            or "Registration rejected. Contact support.",
         )
-    
-    # Create JWT token
+
     token_data = {
         "sub": str(user.id),
         "business_id": str(business.id),
@@ -226,8 +254,8 @@ async def login(
 
     message = None
     if approval == "PENDING":
-        message = "Your business is awaiting platform approval. POS features stay locked until approved."
-    
+        message = "Awaiting approval. POS locked until approved."
+
     return AuthResponse(
         user=UserResponse(
             id=str(user.id),
@@ -267,17 +295,30 @@ async def change_password(
     if not verify_password(request.current_password, current_user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Current password is incorrect.",
+            detail="Current password incorrect",
         )
-    if not (
-        any(c.isupper() for c in request.new_password)
-        and any(c.islower() for c in request.new_password)
-        and any(c.isdigit() for c in request.new_password)
+
+    security = {}
+    if current_user.business_id:
+        biz = db.query(Business).filter(Business.id == current_user.business_id).first()
+        if biz:
+            security = (biz.settings or {}).get("security") or {}
+
+    pw = request.new_password
+    min_len = int(security.get("min_password_length") or 8)
+    if len(pw) < min_len:
+        raise HTTPException(status_code=422, detail=f"Min {min_len} characters")
+    if security.get("require_uppercase", True) and not any(c.isupper() for c in pw):
+        raise HTTPException(status_code=422, detail="Need an uppercase letter")
+    if security.get("require_lowercase", True) and not any(c.islower() for c in pw):
+        raise HTTPException(status_code=422, detail="Need a lowercase letter")
+    if security.get("require_numbers", True) and not any(c.isdigit() for c in pw):
+        raise HTTPException(status_code=422, detail="Need a number")
+    if security.get("require_special_characters") and not any(
+        not c.isalnum() for c in pw
     ):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="New password must include uppercase, lowercase, and a number.",
-        )
+        raise HTTPException(status_code=422, detail="Need a special character")
+
     current_user.password_hash = get_password_hash(request.new_password)
     db.commit()
     return None

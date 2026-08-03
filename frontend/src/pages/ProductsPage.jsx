@@ -2,21 +2,28 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
   FaPlus, FaSearch, FaEdit, FaTrash, FaTimes, FaImage, 
-  FaFilter, FaSort, FaEye, FaCopy, FaBarcode, FaBox,
+  FaFilter, FaSort, FaEye, FaCopy, FaBarcode, FaBox, FaStar,
   FaChevronLeft, FaChevronRight, FaDownload, FaUpload
 } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
 import useProductStore from '../store/productStore';
 import useAuthStore from '../store/authStore';
 import ProductForm from '../components/products/ProductForm';
+import { products as productsApi } from '../api/endpoints';
 import { formatCurrency } from '../utils/helpers';
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const ProductsPage = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [search, setSearch] = useState('');
   const [selectedProducts, setSelectedProducts] = useState([]);
-  const [viewMode, setViewMode] = useState('table'); // table | grid
+  const [viewMode, setViewMode] = useState('table');
+  const [featureProduct, setFeatureProduct] = useState(null);
+  const [featurePhone, setFeaturePhone] = useState('');
+  const [featureBadge, setFeatureBadge] = useState('Save 30%');
+  const [featuring, setFeaturing] = useState(false);
   const { products, loading, fetchProducts, deleteProduct, searchProducts } = useProductStore();
   const user = useAuthStore((state) => state.user);
   const isOwner = user?.role === 'OWNER';
@@ -24,6 +31,38 @@ const ProductsPage = () => {
   useEffect(() => {
     fetchProducts();
   }, []);
+
+  const handleFeature = async () => {
+    if (!featureProduct || !featurePhone.trim()) {
+      toast.error('Enter M-Pesa phone');
+      return;
+    }
+    setFeaturing(true);
+    try {
+      const { data } = await productsApi.feature(featureProduct.id, {
+        phone_number: featurePhone.trim(),
+        badge_text: featureBadge.trim() || 'Featured',
+      });
+      toast.success('STK sent — enter PIN');
+      for (let i = 0; i < 40; i += 1) {
+        const { data: st } = await productsApi.featureStatus(featureProduct.id, data.payment_id);
+        if (st.status === 'COMPLETED' || st.is_featured) {
+          toast.success('Product featured');
+          setFeatureProduct(null);
+          setFeaturePhone('');
+          fetchProducts();
+          return;
+        }
+        if (st.status === 'FAILED') throw new Error(st.result_desc || 'Payment failed');
+        await sleep(3000);
+      }
+      throw new Error('Payment timed out');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || error.message || 'Feature failed');
+    } finally {
+      setFeaturing(false);
+    }
+  };
 
   const handleSearch = (e) => {
     const value = e.target.value;
@@ -39,9 +78,9 @@ const ProductsPage = () => {
     if (window.confirm('Are you sure you want to delete this product?')) {
       try {
         await deleteProduct(id);
-        toast.success('Product deleted successfully');
+        toast.success('Product deleted');
       } catch (error) {
-        toast.error('Failed to delete product');
+        toast.error('Delete failed');
       }
     }
   };
@@ -162,7 +201,7 @@ const ProductsPage = () => {
               ) : products.length === 0 ? (
                 <tr>
                   <td colSpan="8" className="text-center py-12 text-gray-400">
-                    <div className="text-6xl mb-4">📦</div>
+                    <div className="text-6xl mb-4 text-gray-300 flex justify-center"><FaBox /></div>
                     <p>No products found</p>
                     {isOwner && (
                       <button
@@ -228,6 +267,19 @@ const ProductsPage = () => {
                       </td>
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-1">
+                          {isOwner && (
+                            <button
+                              onClick={() => setFeatureProduct(product)}
+                              className={`p-2 rounded-lg transition-colors ${
+                                product.is_featured
+                                  ? 'text-orange-500 bg-orange-50'
+                                  : 'text-gray-400 hover:text-orange-500 hover:bg-orange-50'
+                              }`}
+                              title="Feature on store hero (fee)"
+                            >
+                              <FaStar />
+                            </button>
+                          )}
                           <button
                             onClick={() => {
                               setEditingProduct(product);
@@ -237,18 +289,6 @@ const ProductsPage = () => {
                             title="Edit"
                           >
                             <FaEdit />
-                          </button>
-                          <button
-                            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
-                            title="Quick View"
-                          >
-                            <FaEye />
-                          </button>
-                          <button
-                            className="p-2 text-gray-400 hover:text-green-500 hover:bg-green-50 rounded-lg transition-colors"
-                            title="Duplicate"
-                          >
-                            <FaCopy />
                           </button>
                           {isOwner && (
                             <button
@@ -321,6 +361,46 @@ const ProductsPage = () => {
               }}
             />
           </motion.div>
+        </div>
+      )}
+
+      {featureProduct && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-xl">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                <FaStar className="text-orange-500" /> Feature on DukaMall
+              </h3>
+              <button type="button" onClick={() => setFeatureProduct(null)} className="text-gray-400">
+                <FaTimes />
+              </button>
+            </div>
+            <p className="text-sm text-gray-600 mb-4">
+              Pay a platform fee via M-Pesa to place <strong>{featureProduct.name}</strong> in the store hero.
+            </p>
+            <label className="label-primary">Hero badge text</label>
+            <input
+              className="input-primary mb-3"
+              value={featureBadge}
+              onChange={(e) => setFeatureBadge(e.target.value)}
+              placeholder="Save 30%"
+            />
+            <label className="label-primary">M-Pesa phone</label>
+            <input
+              className="input-primary mb-4"
+              value={featurePhone}
+              onChange={(e) => setFeaturePhone(e.target.value)}
+              placeholder="07XXXXXXXX"
+            />
+            <button
+              type="button"
+              disabled={featuring}
+              onClick={handleFeature}
+              className="btn-primary w-full disabled:opacity-60"
+            >
+              {featuring ? 'Waiting for payment...' : 'Pay & Feature with M-Pesa'}
+            </button>
+          </div>
         </div>
       )}
     </div>

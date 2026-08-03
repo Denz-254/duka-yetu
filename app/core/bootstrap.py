@@ -10,18 +10,24 @@ from app.core.security import get_password_hash
 from app.models.user import User
 
 
+def _column_exists(db: Session, table: str, column: str) -> bool:
+    return bool(
+        db.execute(
+            text(
+                """
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = :table AND column_name = :column
+                """
+            ),
+            {"table": table, "column": column},
+        ).scalar()
+    )
+
+
 def ensure_schema_patches(db: Session) -> None:
     """Apply critical missing columns when Alembic hasn't run yet (e.g. volume mounts)."""
     # products.category_id — required by Product model / marketplace
-    exists = db.execute(
-        text(
-            """
-            SELECT 1 FROM information_schema.columns
-            WHERE table_name = 'products' AND column_name = 'category_id'
-            """
-        )
-    ).scalar()
-    if not exists:
+    if not _column_exists(db, "products", "category_id"):
         db.execute(text("ALTER TABLE products ADD COLUMN category_id UUID"))
         db.execute(
             text(
@@ -47,7 +53,37 @@ def ensure_schema_patches(db: Session) -> None:
             )
         )
         db.commit()
-        print("✅ Schema patch: products.category_id added")
+        print("Schema patch: products.category_id added")
+
+    # Featured product hero placement
+    if not _column_exists(db, "products", "is_featured"):
+        db.execute(
+            text("ALTER TABLE products ADD COLUMN is_featured BOOLEAN NOT NULL DEFAULT false")
+        )
+        db.commit()
+        print("Schema patch: products.is_featured added")
+    if not _column_exists(db, "products", "featured_until"):
+        db.execute(text("ALTER TABLE products ADD COLUMN featured_until TIMESTAMP"))
+        db.commit()
+        print("Schema patch: products.featured_until added")
+    if not _column_exists(db, "products", "featured_badge"):
+        db.execute(text("ALTER TABLE products ADD COLUMN featured_badge VARCHAR(50)"))
+        db.commit()
+        print("Schema patch: products.featured_badge added")
+
+    # Login lockout
+    if not _column_exists(db, "users", "failed_login_attempts"):
+        db.execute(
+            text(
+                "ALTER TABLE users ADD COLUMN failed_login_attempts INTEGER NOT NULL DEFAULT 0"
+            )
+        )
+        db.commit()
+        print("Schema patch: users.failed_login_attempts added")
+    if not _column_exists(db, "users", "locked_until"):
+        db.execute(text("ALTER TABLE users ADD COLUMN locked_until TIMESTAMP"))
+        db.commit()
+        print("Schema patch: users.locked_until added")
 
 
 def ensure_super_admin(db: Session) -> None:
@@ -55,7 +91,7 @@ def ensure_super_admin(db: Session) -> None:
     username = (settings.SUPER_ADMIN_USERNAME or "superadmin").strip()
     password = (settings.SUPER_ADMIN_PASSWORD or "").strip()
     if not password:
-        print("⚠️ SUPER_ADMIN_PASSWORD not set — skipping super-admin bootstrap")
+        print("SUPER_ADMIN_PASSWORD not set — skipping super-admin bootstrap")
         return
 
     user = db.query(User).filter(User.username == username).first()
@@ -66,7 +102,7 @@ def ensure_super_admin(db: Session) -> None:
         user.email = settings.SUPER_ADMIN_EMAIL or user.email
         user.password_hash = get_password_hash(password)
         db.commit()
-        print(f"✅ Super admin ready: {username}")
+        print(f"Super admin ready: {username}")
         return
 
     user = User(
@@ -82,4 +118,4 @@ def ensure_super_admin(db: Session) -> None:
     )
     db.add(user)
     db.commit()
-    print(f"✅ Super admin created: {username}")
+    print(f"Super admin created: {username}")

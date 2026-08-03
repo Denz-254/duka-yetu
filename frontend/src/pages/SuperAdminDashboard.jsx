@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { FaStore, FaCheck, FaTimes, FaSync, FaSignOutAlt, FaShieldAlt } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
 import api from '../api/client';
@@ -8,6 +9,7 @@ import { formatDate } from '../utils/helpers';
 const SuperAdminDashboard = () => {
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
+  const navigate = useNavigate();
   const [overview, setOverview] = useState(null);
   const [businesses, setBusinesses] = useState([]);
   const [notifications, setNotifications] = useState([]);
@@ -62,7 +64,7 @@ const SuperAdminDashboard = () => {
 
   const handleLogout = () => {
     logout();
-    window.location.href = '/login';
+    navigate('/login', { replace: true });
   };
 
   return (

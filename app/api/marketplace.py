@@ -48,6 +48,8 @@ class MarketProduct(BaseModel):
     business_name: str
     category_id: Optional[str] = None
     category_name: Optional[str] = None
+    is_featured: bool = False
+    featured_badge: Optional[str] = None
 
 
 class MarketProductList(BaseModel):
@@ -60,6 +62,27 @@ class MarketCategory(BaseModel):
     name: str
     color: str = "#059669"
     product_count: int = 0
+
+
+def _to_market_product(product: Product, business: Business) -> MarketProduct:
+    featured_active = bool(product.is_featured) and (
+        not product.featured_until or product.featured_until >= datetime.utcnow()
+    )
+    return MarketProduct(
+        id=str(product.id),
+        name=product.name,
+        description=product.description,
+        sku=product.sku,
+        selling_price=product.selling_price,
+        stock_quantity=product.stock_quantity,
+        image_url=product.image_url,
+        business_id=str(business.id),
+        business_name=business.name,
+        category_id=str(product.category_id) if product.category_id else None,
+        category_name=product.category.name if product.category else None,
+        is_featured=featured_active,
+        featured_badge=product.featured_badge if featured_active else None,
+    )
 
 
 @router.get("/categories", response_model=List[MarketCategory])
@@ -137,23 +160,33 @@ def list_marketplace_products(
 
     total = query.count()
     rows = query.order_by(desc(Product.created_at)).offset(skip).limit(limit).all()
-    items = [
-        MarketProduct(
-            id=str(product.id),
-            name=product.name,
-            description=product.description,
-            sku=product.sku,
-            selling_price=product.selling_price,
-            stock_quantity=product.stock_quantity,
-            image_url=product.image_url,
-            business_id=str(business.id),
-            business_name=business.name,
-            category_id=str(product.category_id) if product.category_id else None,
-            category_name=product.category.name if product.category else None,
-        )
-        for product, business in rows
-    ]
+    items = [_to_market_product(product, business) for product, business in rows]
     return MarketProductList(items=items, total=total)
+
+
+@router.get("/featured", response_model=List[MarketProduct])
+def list_featured_products(
+    db: Session = Depends(get_db),
+    limit: int = Query(6, ge=1, le=20),
+):
+    """Products paid to appear on the store hero."""
+    now = datetime.utcnow()
+    rows = (
+        db.query(Product, Business)
+        .join(Business, Business.id == Product.business_id)
+        .filter(
+            Product.is_active == True,  # noqa: E712
+            Product.stock_quantity > 0,
+            Product.is_featured == True,  # noqa: E712
+            Business.is_active == True,  # noqa: E712
+            Business.approval_status == "APPROVED",
+            or_(Product.featured_until == None, Product.featured_until >= now),  # noqa: E711
+        )
+        .order_by(desc(Product.featured_until), desc(Product.created_at))
+        .limit(limit)
+        .all()
+    )
+    return [_to_market_product(product, business) for product, business in rows]
 
 
 class CheckoutItem(BaseModel):
@@ -205,19 +238,7 @@ def get_marketplace_product(product_id: UUID, db: Session = Depends(get_db)):
     if not row:
         raise HTTPException(status_code=404, detail="Product not found")
     product, business = row
-    return MarketProduct(
-        id=str(product.id),
-        name=product.name,
-        description=product.description,
-        sku=product.sku,
-        selling_price=product.selling_price,
-        stock_quantity=product.stock_quantity,
-        image_url=product.image_url,
-        business_id=str(business.id),
-        business_name=business.name,
-        category_id=str(product.category_id) if product.category_id else None,
-        category_name=product.category.name if product.category else None,
-    )
+    return _to_market_product(product, business)
 
 
 @router.post("/checkout", response_model=MarketplaceCheckoutResponse, status_code=201)
@@ -369,4 +390,26 @@ def get_public_order_status(order_id: UUID, db: Session = Depends(get_db)):
         total_amount=order.total_amount,
         mpesa_receipt_number=order.mpesa_receipt_number,
         business_name=business.name if business else None,
+    )
+
+
+@router.get("/orders/{order_id}/invoice")
+def download_order_invoice(order_id: UUID, db: Session = Depends(get_db)):
+    """Generate downloadable HTML invoice for a paid M-Pesa marketplace order."""
+    from fastapi.responses import HTMLResponse
+
+    from app.utils.invoice_generator import generate_order_invoice_html
+
+    order = db.query(OnlineOrder).filter(OnlineOrder.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    if order.payment_status != "PAID":
+        raise HTTPException(status_code=400, detail="Invoice available after payment")
+    business = db.query(Business).filter(Business.id == order.business_id).first()
+    html = generate_order_invoice_html(order, business)
+    return HTMLResponse(
+        content=html,
+        headers={
+            "Content-Disposition": f'attachment; filename="invoice-{order.order_number}.html"'
+        },
     )
