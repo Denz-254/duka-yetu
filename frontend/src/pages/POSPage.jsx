@@ -183,7 +183,7 @@ const POSPage = () => {
                 <div className="text-gray-400">Loading products...</div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 max-h-[550px] overflow-y-auto p-1">
+              <div className="grid grid-cols-1 gap-4 max-h-[550px] overflow-y-auto p-1">
                 {filteredProducts.map((product) => (
                   <motion.div
                     key={product.id}
@@ -193,32 +193,32 @@ const POSPage = () => {
                     }`}
                   >
                     <div className="px-4 py-3">
-                      <h3 className="text-lg font-bold text-gray-800 uppercase line-clamp-1">{product.name}</h3>
-                      <p className="mt-1 text-sm text-gray-500 line-clamp-2">
+                      <h3 className="text-xl font-bold text-gray-800 uppercase line-clamp-1">{product.name}</h3>
+                      <p className="mt-1 text-sm text-gray-600 line-clamp-2">
                         {product.description || product.sku}
                       </p>
                     </div>
                     {product.image_url ? (
                       <img
-                        className="object-cover w-full h-40"
+                        className="object-cover w-full h-48 mt-2"
                         src={product.image_url}
                         alt={product.name}
                       />
                     ) : (
-                      <div className="w-full h-40 bg-primary-50 flex items-center justify-center text-primary-300">
+                      <div className="w-full h-48 mt-2 bg-primary-50 flex items-center justify-center text-primary-300">
                         <FaBarcode className="text-4xl" />
                       </div>
                     )}
-                    <div className="flex items-center justify-between px-4 py-3 bg-primary-900">
-                      <h4 className="text-base font-bold text-white">{formatCurrency(product.selling_price)}</h4>
+                    <div className="flex items-center justify-between px-4 py-2 bg-gray-900">
+                      <h4 className="text-lg font-bold text-white">{formatCurrency(product.selling_price)}</h4>
                       <button
                         type="button"
                         disabled={product.stock_quantity <= 0}
                         onClick={() => {
                           addItem(product);
-                          toast.success(`${product.name} added to cart`);
+                          toast.success(`${product.name} added`);
                         }}
-                        className="px-2 py-1 text-xs font-semibold text-primary-900 uppercase transition-colors duration-300 transform bg-white rounded hover:bg-primary-50 disabled:bg-gray-300 disabled:text-gray-500 focus:outline-none"
+                        className="px-2 py-1 text-xs font-semibold text-gray-900 uppercase transition-colors duration-300 transform bg-white rounded hover:bg-gray-200 disabled:bg-gray-300 disabled:text-gray-500 focus:outline-none"
                       >
                         {product.stock_quantity > 0 ? 'Add to cart' : 'Out of stock'}
                       </button>

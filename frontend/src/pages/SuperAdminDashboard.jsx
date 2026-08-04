@@ -2,12 +2,13 @@
 import { useNavigate } from 'react-router-dom';
 import {
   FaStore, FaCheck, FaTimes, FaSync, FaSignOutAlt, FaShieldAlt,
-  FaStar, FaSearch, FaTrash,
+  FaStar, FaSearch, FaTrash, FaFileInvoice, FaChartLine, FaMoneyBillWave,
 } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
 import api from '../api/client';
 import useAuthStore from '../store/authStore';
 import { formatCurrency, formatDate } from '../utils/helpers';
+import Modal from '../components/common/Modal';
 
 const SuperAdminDashboard = () => {
   const user = useAuthStore((state) => state.user);
@@ -15,6 +16,7 @@ const SuperAdminDashboard = () => {
   const navigate = useNavigate();
   const [overview, setOverview] = useState(null);
   const [businesses, setBusinesses] = useState([]);
+  const [analyticsBiz, setAnalyticsBiz] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [orders, setOrders] = useState([]);
   const [filter, setFilter] = useState('PENDING');
@@ -22,9 +24,11 @@ const SuperAdminDashboard = () => {
   const [featured, setFeatured] = useState([]);
   const [productQuery, setProductQuery] = useState('');
   const [productResults, setProductResults] = useState([]);
-  const [featureDays, setFeatureDays] = useState(7);
+  const [featureDays, setFeatureDays] = useState(30);
   const [badgeText, setBadgeText] = useState('Featured');
   const [featLoading, setFeatLoading] = useState(false);
+  const [rejectModal, setRejectModal] = useState({ open: false, id: null });
+  const [rejectReason, setRejectReason] = useState('');
 
   const loadFeatured = async () => {
     try {
@@ -38,16 +42,18 @@ const SuperAdminDashboard = () => {
   const load = async () => {
     setLoading(true);
     try {
-      const [overviewRes, listRes, notesRes, ordersRes] = await Promise.all([
+      const [overviewRes, listRes, notesRes, ordersRes, analyticsRes] = await Promise.all([
         api.get('/admin/overview'),
         api.get('/admin/businesses', { params: filter ? { approval_status: filter } : {} }),
         api.get('/admin/notifications'),
         api.get('/admin/orders'),
+        api.get('/admin/analytics'),
       ]);
       setOverview(overviewRes.data);
       setBusinesses(listRes.data || []);
       setNotifications(notesRes.data || []);
       setOrders(ordersRes.data || []);
+      setAnalyticsBiz(analyticsRes.data?.businesses || []);
       await loadFeatured();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Load failed');
@@ -78,7 +84,7 @@ const SuperAdminDashboard = () => {
     setFeatLoading(true);
     try {
       await api.post(`/admin/featured/${productId}`, { days: featureDays, badge_text: badgeText || 'Featured' });
-      toast.success('Added to hero');
+      toast.success('Featured for 1 month (or chosen days)');
       setProductResults([]);
       setProductQuery('');
       await loadFeatured();
@@ -109,14 +115,34 @@ const SuperAdminDashboard = () => {
     }
   };
 
-  const reject = async (id) => {
-    const reason = window.prompt('Rejection reason (optional)') || '';
+  const confirmReject = async () => {
+    if (!rejectModal.id) return;
     try {
-      await api.post(`/admin/businesses/${id}/reject`, { reason });
+      await api.post(`/admin/businesses/${rejectModal.id}/reject`, { reason: rejectReason || '' });
       toast.success('Business rejected');
+      setRejectModal({ open: false, id: null });
+      setRejectReason('');
       load();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Reject failed');
+    }
+  };
+
+  const downloadInvoice = async (bizId, bizName) => {
+    try {
+      const res = await api.get(`/admin/businesses/${bizId}/subscription-invoice`, {
+        params: { billing_cycle: 'monthly' },
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'text/html' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `invoice-${(bizName || 'business').replace(/\s+/g, '-')}.html`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      toast.success('Invoice downloaded — send to the business');
+    } catch {
+      toast.error('Invoice failed');
     }
   };
 
@@ -146,20 +172,67 @@ const SuperAdminDashboard = () => {
       </header>
 
       <main className="max-w-6xl mx-auto p-6 space-y-6">
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
           {[
-            ['Total', overview?.total_businesses],
+            ['Businesses', overview?.total_businesses],
             ['Pending', overview?.pending_businesses],
             ['Approved', overview?.approved_businesses],
-            ['Rejected', overview?.rejected_businesses],
-            ['Products', overview?.total_products],
-            ['Sales', overview?.total_sales],
+            ['Shoppers', overview?.shoppers],
+            ['POS revenue', overview?.pos_revenue != null ? formatCurrency(overview.pos_revenue) : '—'],
+            ['Marketplace', overview?.marketplace_revenue != null ? formatCurrency(overview.marketplace_revenue) : '—'],
+            ['Commission', overview?.platform_commission != null ? formatCurrency(overview.platform_commission) : '—'],
+            ['Featured live', overview?.featured_active],
           ].map(([label, value]) => (
             <div key={label} className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
               <p className="text-xs text-gray-500">{label}</p>
-              <p className="text-2xl font-bold text-gray-800 mt-1">{value ?? '—'}</p>
+              <p className="text-xl font-bold text-gray-800 mt-1">{value ?? '—'}</p>
             </div>
           ))}
+        </div>
+
+        {/* Business performance analytics */}
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+          <h2 className="font-bold text-gray-800 flex items-center gap-2 mb-1">
+            <FaChartLine className="text-primary-600" /> Business performance
+          </h2>
+          <p className="text-sm text-gray-500 mb-4">Sales, online GMV, and commission per registered shop</p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-gray-500 border-b">
+                  <th className="py-2 pr-3">Business</th>
+                  <th className="py-2 pr-3">Plan</th>
+                  <th className="py-2 pr-3">POS sales</th>
+                  <th className="py-2 pr-3">Online</th>
+                  <th className="py-2 pr-3">Platform cut</th>
+                  <th className="py-2">Invoice</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(analyticsBiz.length ? analyticsBiz : businesses).slice(0, 50).map((biz) => (
+                  <tr key={biz.id} className="border-b border-gray-50">
+                    <td className="py-2 pr-3 font-medium">{biz.name}</td>
+                    <td className="py-2 pr-3 text-gray-500">{biz.package}</td>
+                    <td className="py-2 pr-3">{formatCurrency(biz.sales_revenue || 0)} <span className="text-xs text-gray-400">({biz.sales_count || 0})</span></td>
+                    <td className="py-2 pr-3">{formatCurrency(biz.online_revenue || 0)}</td>
+                    <td className="py-2 pr-3 text-emerald-700">{formatCurrency(biz.platform_commission || 0)}</td>
+                    <td className="py-2">
+                      <button
+                        type="button"
+                        onClick={() => downloadInvoice(biz.id, biz.name)}
+                        className="text-xs px-2 py-1 rounded bg-slate-900 text-white flex items-center gap-1"
+                      >
+                        <FaFileInvoice /> Sub invoice
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {!analyticsBiz.length && !businesses.length && (
+              <p className="text-sm text-gray-400 py-4">No businesses yet</p>
+            )}
+          </div>
         </div>
 
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
@@ -167,7 +240,7 @@ const SuperAdminDashboard = () => {
             <FaStar className="text-amber-500" /> Store hero featured products
           </h2>
           <p className="text-sm text-gray-500 mb-4">
-            Add products for clients who paid for hero placement. Sellers may also self-feature via Products.
+            Featured slots last <strong>30 days</strong> by default. Days remaining shown for admin only.
           </p>
           <div className="grid md:grid-cols-3 gap-3 mb-4">
             <form onSubmit={searchProducts} className="md:col-span-2 flex gap-2">
@@ -178,7 +251,7 @@ const SuperAdminDashboard = () => {
               <button type="submit" className="btn-primary">Search</button>
             </form>
             <div className="flex gap-2">
-              <input type="number" min={1} max={90} value={featureDays} onChange={(e) => setFeatureDays(parseInt(e.target.value, 10) || 7)} className="input-primary w-24" title="Days" />
+              <input type="number" min={1} max={90} value={featureDays} onChange={(e) => setFeatureDays(parseInt(e.target.value, 10) || 30)} className="input-primary w-24" title="Days" />
               <input value={badgeText} onChange={(e) => setBadgeText(e.target.value)} className="input-primary flex-1" placeholder="Badge text" />
             </div>
           </div>
@@ -211,6 +284,10 @@ const SuperAdminDashboard = () => {
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm truncate">{p.name}</p>
                     <p className="text-xs text-gray-400 truncate">{p.business_name}</p>
+                    <p className="text-xs font-semibold text-amber-700 mt-0.5">
+                      {p.days_remaining != null ? `${p.days_remaining} day${p.days_remaining === 1 ? '' : 's'} left` : 'No end date'}
+                      {p.featured_until ? ` · until ${formatDate(p.featured_until)}` : ''}
+                    </p>
                   </div>
                   <button type="button" onClick={() => unfeature(p.id)} className="p-2 text-gray-400 hover:text-red-500"><FaTrash /></button>
                 </div>
@@ -234,7 +311,9 @@ const SuperAdminDashboard = () => {
 
         {orders.length > 0 && (
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-            <h2 className="font-bold text-gray-800 mb-3">Recent marketplace orders</h2>
+            <h2 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+              <FaMoneyBillWave className="text-green-600" /> Recent marketplace orders
+            </h2>
             <div className="space-y-2">
               {orders.slice(0, 8).map((order) => (
                 <div key={order.id} className="flex justify-between text-sm border-b border-gray-50 pb-2">
@@ -270,15 +349,23 @@ const SuperAdminDashboard = () => {
                   <div>
                     <p className="font-semibold text-gray-800">{biz.name}</p>
                     <p className="text-sm text-gray-500">{biz.owner_name} · {biz.email} · {biz.phone}</p>
-                    <p className="text-xs text-gray-400 mt-1">Registered {formatDate(biz.created_at)} · {biz.package} · {biz.products_count} products</p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Registered {formatDate(biz.created_at)} · {biz.package} · {biz.products_count} products
+                      {biz.sales_revenue != null && ` · POS ${formatCurrency(biz.sales_revenue)}`}
+                    </p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${biz.approval_status === 'APPROVED' ? 'bg-green-100 text-green-700' : biz.approval_status === 'REJECTED' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>{biz.approval_status}</span>
+                    {biz.approval_status === 'APPROVED' && (
+                      <button type="button" onClick={() => downloadInvoice(biz.id, biz.name)} className="px-3 py-2 rounded-lg bg-slate-800 text-white text-sm flex items-center gap-1">
+                        <FaFileInvoice /> Invoice
+                      </button>
+                    )}
                     {biz.approval_status !== 'APPROVED' && (
                       <button type="button" onClick={() => approve(biz.id)} className="px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm flex items-center gap-1"><FaCheck /> Approve</button>
                     )}
                     {biz.approval_status !== 'REJECTED' && (
-                      <button type="button" onClick={() => reject(biz.id)} className="px-3 py-2 rounded-lg bg-red-600 text-white text-sm flex items-center gap-1"><FaTimes /> Reject</button>
+                      <button type="button" onClick={() => { setRejectModal({ open: true, id: biz.id }); setRejectReason(''); }} className="px-3 py-2 rounded-lg bg-red-600 text-white text-sm flex items-center gap-1"><FaTimes /> Reject</button>
                     )}
                   </div>
                 </div>
@@ -287,6 +374,24 @@ const SuperAdminDashboard = () => {
           )}
         </div>
       </main>
+
+      <Modal
+        open={rejectModal.open}
+        title="Reject business"
+        confirmLabel="Reject"
+        danger
+        onClose={() => setRejectModal({ open: false, id: null })}
+        onConfirm={confirmReject}
+      >
+        <p className="mb-3">Optional reason sent for your records:</p>
+        <textarea
+          className="input-primary w-full"
+          rows={3}
+          value={rejectReason}
+          onChange={(e) => setRejectReason(e.target.value)}
+          placeholder="Reason (optional)"
+        />
+      </Modal>
     </div>
   );
 };

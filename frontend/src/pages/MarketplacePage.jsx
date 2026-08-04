@@ -10,6 +10,8 @@ import { AnimatePresence, motion } from 'framer-motion';
 import api from '../api/client';
 import useMarketCartStore from '../store/marketCartStore';
 import { formatCurrency } from '../utils/helpers';
+import Seo from '../components/common/Seo';
+import useAuthStore from '../store/authStore';
 
 const CAT_ICONS = [FaStore, FaHeart, FaMobileAlt, FaTruck, FaStar, FaShieldAlt];
 
@@ -34,52 +36,41 @@ function useHorizontalScroll() {
 }
 
 const ProductCard = ({ product, onAdd }) => (
-  <article className="w-[156px] sm:w-[180px] md:w-[196px] shrink-0 group">
-    <div className="relative bg-white rounded-3xl shadow-[0_4px_20px_rgba(0,0,0,0.06)] border border-gray-100/80 overflow-hidden transition-all duration-300 group-hover:shadow-[0_8px_28px_rgba(5,150,105,0.12)] group-hover:-translate-y-0.5">
-      {/* Soft square media zone */}
-      <div className="relative mx-2.5 mt-2.5 mb-0 rounded-2xl overflow-hidden bg-gradient-to-b from-primary-50 to-gray-50 aspect-square">
-        <Link to={`/shop/product/${product.id}`} className="absolute inset-0 flex items-center justify-center p-3">
-          {product.image_url ? (
-            <img
-              src={product.image_url}
-              alt={product.name}
-              className="max-w-full max-h-full object-contain drop-shadow-sm group-hover:scale-105 transition-transform duration-500"
-            />
-          ) : (
-            <FaStore className="text-3xl text-primary-200" />
-          )}
-        </Link>
-        {product.featured_badge && (
-          <span className="absolute top-2 left-2 z-[1] bg-primary-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-full tracking-wide uppercase">
-            {product.featured_badge}
-          </span>
-        )}
-        {/* Circular add — Nike-card style */}
-        <button
-          type="button"
-          onClick={() => onAdd(product)}
-          className="absolute -bottom-3 right-2 z-[2] w-10 h-10 rounded-full bg-primary-600 text-white shadow-lg shadow-primary-600/30 flex items-center justify-center hover:bg-primary-700 active:scale-95 transition"
-          title="Add to cart"
-        >
-          <FaShoppingCart className="text-sm" />
-        </button>
-      </div>
+  <article className="w-[200px] sm:w-[220px] md:w-[240px] shrink-0 max-w-xs overflow-hidden bg-white rounded-lg shadow-lg">
+    <div className="px-4 py-2">
+      <Link to={`/shop/product/${product.id}`}>
+        <h1 className="text-base sm:text-lg font-bold text-gray-800 uppercase line-clamp-1 hover:text-primary-700">
+          {product.name}
+        </h1>
+      </Link>
+      <p className="mt-1 text-xs sm:text-sm text-gray-600 line-clamp-2 min-h-[2.5rem]">
+        {product.description || product.category_name || `Sold by ${product.business_name}`}
+      </p>
+    </div>
 
-      <div className="px-3.5 pt-5 pb-3.5">
-        <p className="text-[10px] font-medium uppercase tracking-wider text-primary-600/80 truncate">
-          {product.category_name || product.business_name || 'DukaMall'}
-        </p>
-        <Link to={`/shop/product/${product.id}`}>
-          <h3 className="mt-0.5 font-semibold text-gray-900 text-[13px] leading-snug line-clamp-1 hover:text-primary-700">
-            {product.name}
-          </h3>
-        </Link>
-        <div className="mt-2 flex items-end justify-between gap-2">
-          <p className="text-[15px] font-bold text-gray-900 tracking-tight">
-            {formatCurrency(product.selling_price)}
-          </p>
+    <Link to={`/shop/product/${product.id}`}>
+      {product.image_url ? (
+        <img
+          className="object-cover w-full h-48 mt-2"
+          src={product.image_url}
+          alt={product.name}
+        />
+      ) : (
+        <div className="w-full h-48 mt-2 bg-primary-50 flex items-center justify-center text-primary-300">
+          <FaStore className="text-4xl" />
         </div>
-      </div>
+      )}
+    </Link>
+
+    <div className="flex items-center justify-between px-4 py-2 bg-gray-900">
+      <h1 className="text-sm sm:text-lg font-bold text-white">{formatCurrency(product.selling_price)}</h1>
+      <button
+        type="button"
+        onClick={() => onAdd(product)}
+        className="px-2 py-1 text-xs font-semibold text-gray-900 uppercase transition-colors duration-300 transform bg-white rounded hover:bg-gray-200 focus:bg-gray-400 focus:outline-none"
+      >
+        Add to cart
+      </button>
     </div>
   </article>
 );
@@ -140,6 +131,7 @@ const MarketplacePage = () => {
   const [searchOpen, setSearchOpen] = useState(false);
   const addItem = useMarketCartStore((state) => state.addItem);
   const cartCount = useMarketCartStore((state) => state.items.length);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const catScroll = useHorizontalScroll();
 
   const heroSlides = useMemo(() => {
@@ -212,6 +204,11 @@ const MarketplacePage = () => {
 
   return (
     <div className="store-front min-h-screen bg-white text-gray-900">
+      <Seo
+        title="DukaMall Online Shop | Duka Yetu"
+        description="Shop quality products from verified Kenyan sellers. Pay securely with M-Pesa on DukaMall."
+        path="/shop"
+      />
       {/* Top utility bar */}
       <div className="bg-primary-800 text-primary-100 text-xs">
         <div className="max-w-7xl mx-auto px-4 py-2 flex flex-wrap items-center justify-between gap-2">
@@ -284,7 +281,7 @@ const MarketplacePage = () => {
             >
               <FaSearch />
             </button>
-            <Link to="/login" className="p-2 hover:text-primary-600" title="Account"><FaUser /></Link>
+            <Link to={isAuthenticated ? '/shop/checkout' : '/shop/register'} className="p-2 hover:text-primary-600" title="Account"><FaUser /></Link>
             <span className="p-2 text-gray-300" title="Wishlist"><FaHeart /></span>
             <Link to="/shop/checkout" className="relative p-2 hover:text-primary-600" title="Cart">
               <FaShoppingCart />
@@ -640,10 +637,25 @@ const MarketplacePage = () => {
           </div>
           <div>
             <h4 className="text-white font-semibold mb-3 text-sm">Payments</h4>
-            <div className="flex flex-wrap gap-2">
-              <span className="bg-white/10 text-white text-xs px-2.5 py-1.5 rounded">M-Pesa</span>
-              <span className="bg-white/10 text-white text-xs px-2.5 py-1.5 rounded">Visa</span>
-              <span className="bg-white/10 text-white text-xs px-2.5 py-1.5 rounded">Mastercard</span>
+            <div className="flex flex-wrap items-center gap-3">
+              {/* M-Pesa badge */}
+              <span className="inline-flex items-center h-9 px-2.5 rounded bg-[#4caf50] text-white text-[11px] font-bold tracking-wide shadow-sm" title="M-Pesa">
+                <FaMobileAlt className="mr-1.5" /> M-PESA
+              </span>
+              {/* Visa */}
+              <span className="inline-flex items-center justify-center h-9 px-3 rounded bg-white shadow-sm" title="Visa">
+                <svg viewBox="0 0 48 16" className="h-4 w-12" aria-hidden>
+                  <path fill="#1A1F71" d="M19.5 1.2h-3.4l-2.1 13.6h3.4L19.5 1.2zM13.2 1.2L10 11.5l-.4-1.9L8.2 3.1C8 2 7.3 1.2 6.2 1.2H.7L.6 1.5c1.1.2 2.3.6 3 1 .5.3.6.5.8 1.1l2.9 11.2h3.6l5.5-13.6h-3.2zM35.3 1.2l-3.3 13.6h3.2l3.3-13.6h-3.2zM44.4 1.2c-.8 0-1.4.2-1.8.5-.4.3-.6.7-.7 1.3l-2.6 11.8h3.4l.4-1.7h4.1l.2 1.7h3L48 1.2h-3.6zm.3 3.3l1 4.7h-2.7l1.7-4.7zM29 1.2c-1.1 0-2 .3-2.5.7-.6.4-.9 1-1 1.7l-2.7 11.2h3.4l.7-3h3.8c.1.4.2 1.1.2 1.1h3l-1.3-9.3c-.2-1.4-1.2-2.4-3.6-2.4zm.4 3.5c.1 0 .2 0 .3.1.3.2.4.5.5.9l1 5.5h-2.6l1.6-6.4c0-.1.1 0 .1-.1.1 0 0 0 .1 0z" />
+                </svg>
+              </span>
+              {/* Mastercard */}
+              <span className="inline-flex items-center justify-center h-9 px-2.5 rounded bg-white shadow-sm" title="Mastercard">
+                <svg viewBox="0 0 40 24" className="h-5 w-9" aria-hidden>
+                  <circle cx="15" cy="12" r="8" fill="#EB001B" />
+                  <circle cx="25" cy="12" r="8" fill="#F79E1B" />
+                  <path fill="#FF5F00" d="M20 5.8a8 8 0 0 1 0 12.4 8 8 0 0 1 0-12.4z" />
+                </svg>
+              </span>
             </div>
           </div>
         </div>

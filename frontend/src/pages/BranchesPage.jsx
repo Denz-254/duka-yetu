@@ -6,6 +6,7 @@ import {
   FaChartLine, FaCheckCircle, FaTimesCircle, FaClock
 } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
+import Modal from '../components/common/Modal';
 import { formatCurrency } from '../utils/helpers';
 import { branches as branchesApi } from '../api/endpoints';
 
@@ -15,6 +16,7 @@ const BranchesPage = () => {
   const [showModal, setShowModal] = useState(false);
   const [editingBranch, setEditingBranch] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [deleteBranchId, setDeleteBranchId] = useState(null);
   const [formData, setFormData] = useState({
     name: '', location: '', phone: '', email: '', manager: '', status: 'active',
   });
@@ -190,12 +192,7 @@ const BranchesPage = () => {
                   <FaEdit />
                 </button>
                 <button
-                  onClick={() => {
-                    if (!window.confirm('Are you sure you want to delete this branch?')) return;
-                    branchesApi.delete(branch.id)
-                      .then(() => { toast.success('Branch deleted successfully'); fetchBranches(); })
-                      .catch((error) => toast.error(error.response?.data?.detail || 'Failed to delete branch'));
-                  }}
+                  onClick={() => setDeleteBranchId(branch.id)}
                   className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                 >
                   <FaTrash />
@@ -313,6 +310,20 @@ const BranchesPage = () => {
           </motion.div>
         </div>
       )}
+      <Modal
+        open={!!deleteBranchId}
+        title="Delete branch"
+        confirmLabel="Delete"
+        danger
+        onClose={() => setDeleteBranchId(null)}
+        onConfirm={() => {
+          branchesApi.delete(deleteBranchId)
+            .then(() => { toast.success('Branch deleted successfully'); setDeleteBranchId(null); fetchBranches(); })
+            .catch((error) => toast.error(error.response?.data?.detail || 'Failed to delete branch'));
+        }}
+      >
+        Are you sure you want to delete this branch?
+      </Modal>
     </div>
   );
 };

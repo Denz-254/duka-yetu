@@ -4,6 +4,9 @@ import useAuthStore from './store/authStore';
 import useSubscriptionStore from './store/subscriptionStore';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import ShopRegisterPage from './pages/ShopRegisterPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 import LandingPage from './pages/LandingPage';
 import DashboardPage from './pages/DashboardPage';
 import ProductsPage from './pages/ProductsPage';
@@ -49,6 +52,7 @@ const ApprovedBusinessRoute = ({ children }) => {
   const business = useAuthStore((state) => state.business);
   if (!isAuthenticated) return <Navigate to="/login" />;
   if (user?.role === 'SUPER_ADMIN') return <Navigate to="/admin" />;
+  if (user?.role === 'SHOPPER') return <Navigate to="/shop" />;
   if (business?.approval_status && business.approval_status !== 'APPROVED') {
     return <Navigate to="/pending-approval" />;
   }
@@ -88,6 +92,9 @@ function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/shop/register" element={<ShopRegisterPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/shop" element={<MarketplacePage />} />
         <Route path="/shop/product/:id" element={<MarketplaceProductPage />} />
         <Route path="/shop/checkout" element={<MarketplaceCheckoutPage />} />

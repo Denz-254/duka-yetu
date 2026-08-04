@@ -9,6 +9,7 @@ import {
 import { toast } from 'react-hot-toast';
 import { customers as customersApi } from '../api/endpoints';
 import { formatCurrency, formatDate } from '../utils/helpers';
+import Modal from '../components/common/Modal';
 
 const CustomersPage = () => {
   const [customers, setCustomers] = useState([]);
@@ -18,6 +19,7 @@ const CustomersPage = () => {
   const [showModal, setShowModal] = useState(false);
   const [showFormModal, setShowFormModal] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [formData, setFormData] = useState({
     name: '', email: '', phone: '', address: '', status: 'active', notes: '',
   });
@@ -70,12 +72,13 @@ const CustomersPage = () => {
     }
   };
 
-  const deleteCustomer = async (customer) => {
-    if (!window.confirm(`Delete ${customer.name}?`)) return;
+  const deleteCustomer = async () => {
+    if (!deleteTarget) return;
     try {
-      await customersApi.delete(customer.id);
+      await customersApi.delete(deleteTarget.id);
       toast.success('Customer deleted successfully');
       setShowModal(false);
+      setDeleteTarget(null);
       fetchCustomers();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to delete customer');
@@ -203,7 +206,7 @@ const CustomersPage = () => {
               <h2 className="text-xl font-bold text-gray-800">Customer Details</h2>
               <div className="flex items-center gap-2">
                 <button onClick={() => { setShowModal(false); openCustomerForm(selectedCustomer); }} className="p-2 text-blue-500"><FaEdit /></button>
-                <button onClick={() => deleteCustomer(selectedCustomer)} className="p-2 text-red-500"><FaTrash /></button>
+                <button onClick={() => setDeleteTarget(selectedCustomer)} className="p-2 text-red-500"><FaTrash /></button>
                 <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600">✕</button>
               </div>
             </div>
@@ -294,6 +297,17 @@ const CustomersPage = () => {
           </motion.div>
         </div>
       )}
+
+      <Modal
+        open={!!deleteTarget}
+        title="Delete customer"
+        confirmLabel="Delete"
+        danger
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={deleteCustomer}
+      >
+        Delete {deleteTarget?.name}?
+      </Modal>
     </div>
   );
 };

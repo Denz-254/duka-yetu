@@ -25,6 +25,8 @@ class User(Base):
     login_time = Column(DateTime)
     failed_login_attempts = Column(Integer, default=0, nullable=False)
     locked_until = Column(DateTime, nullable=True)
+    password_reset_token = Column(String(128), nullable=True, index=True)
+    password_reset_expires = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     # branch_id - for multi-branch support (optional)

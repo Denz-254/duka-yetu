@@ -5,6 +5,7 @@ from fastapi.security import HTTPBearer
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from typing import Optional
+from pydantic import BaseModel, EmailStr, Field
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
@@ -195,7 +196,7 @@ async def login(
     db.commit()
     db.refresh(user)
 
-    # Super admin has no store business
+    # Super admin / shopper has no store business
     if user.role == "SUPER_ADMIN":
         token_data = {
             "sub": str(user.id),
@@ -221,6 +222,33 @@ async def login(
                 expires_in=1440,
             ),
             message="Welcome, platform admin",
+        )
+
+    if user.role == "SHOPPER":
+        token_data = {
+            "sub": str(user.id),
+            "business_id": None,
+            "role": user.role,
+            "username": user.username,
+        }
+        access_token = create_access_token(token_data)
+        return AuthResponse(
+            user=UserResponse(
+                id=str(user.id),
+                name=user.name,
+                email=user.email,
+                phone=user.phone,
+                username=user.username,
+                role=user.role,
+                business_id=None,
+            ),
+            business=None,
+            token=TokenResponse(
+                access_token=access_token,
+                token_type="bearer",
+                expires_in=1440,
+            ),
+            message="Welcome to DukaMall",
         )
 
     # Get business
@@ -322,3 +350,143 @@ async def change_password(
     current_user.password_hash = get_password_hash(request.new_password)
     db.commit()
     return None
+
+
+class ShopperRegisterRequest(BaseModel):
+    name: str = Field(..., min_length=2, max_length=255)
+    email: EmailStr
+    phone: str = Field(..., min_length=9, max_length=30)
+    password: str = Field(..., min_length=8)
+    username: Optional[str] = Field(None, min_length=3, max_length=100)
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(..., min_length=10)
+    new_password: str = Field(..., min_length=8)
+
+
+class VerifyPasswordRequest(BaseModel):
+    password: str = Field(..., min_length=1)
+
+
+@router.post("/shop/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
+async def shopper_register(request: ShopperRegisterRequest, db: Session = Depends(get_db)):
+    """DukaMall shopper account (different from business seller registration)."""
+    username = (request.username or request.email.split("@")[0]).strip().lower()
+    username = "".join(c for c in username if c.isalnum() or c in "._-")[:100] or "shopper"
+    # ensure unique username
+    base = username
+    n = 0
+    while db.query(User).filter(User.username == username).first():
+        n += 1
+        username = f"{base}{n}"
+
+    if db.query(User).filter(User.email == request.email).first():
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    user = User(
+        business_id=None,
+        name=request.name.strip(),
+        email=str(request.email).lower(),
+        phone=request.phone.strip(),
+        username=username,
+        password_hash=get_password_hash(request.password),
+        role="SHOPPER",
+        is_active=True,
+        login_time=datetime.utcnow(),
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    token_data = {
+        "sub": str(user.id),
+        "business_id": None,
+        "role": user.role,
+        "username": user.username,
+    }
+    access_token = create_access_token(token_data)
+    return AuthResponse(
+        user=UserResponse(
+            id=str(user.id),
+            name=user.name,
+            email=user.email,
+            phone=user.phone,
+            username=user.username,
+            role=user.role,
+            business_id=None,
+        ),
+        business=None,
+        token=TokenResponse(access_token=access_token, token_type="bearer", expires_in=1440),
+        message="Shopper account created",
+    )
+
+
+@router.post("/forgot-password")
+async def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    """Always returns success message. Emails reset link when user exists."""
+    import secrets
+    from app.core.config import settings
+    from app.services.email import send_email
+
+    user = db.query(User).filter(User.email == str(request.email).lower()).first()
+    msg = "If that email exists, a reset link was sent."
+    if not user:
+        return {"message": msg}
+
+    token = secrets.token_urlsafe(32)
+    user.password_reset_token = token
+    user.password_reset_expires = datetime.utcnow() + timedelta(hours=2)
+    db.commit()
+
+    reset_url = f"{settings.FRONTEND_URL.rstrip('/')}/reset-password?token={token}"
+    try:
+        await send_email(
+            user.email,
+            "Reset your Duka Yetu password",
+            f"<p>Hi {user.name},</p><p>Reset your password:</p>"
+            f"<p><a href='{reset_url}'>{reset_url}</a></p>"
+            f"<p>Link expires in 2 hours.</p>",
+        )
+    except Exception:  # noqa: BLE001
+        pass
+    # Dev fallback: include token when DEBUG for local testing without Resend
+    payload = {"message": msg}
+    if settings.DEBUG:
+        payload["debug_token"] = token
+        payload["reset_url"] = reset_url
+    return payload
+
+
+@router.post("/reset-password")
+async def reset_password(request: ResetPasswordRequest, db: Session = Depends(get_db)):
+    user = (
+        db.query(User)
+        .filter(User.password_reset_token == request.token)
+        .first()
+    )
+    if not user or not user.password_reset_expires or user.password_reset_expires < datetime.utcnow():
+        raise HTTPException(status_code=400, detail="Invalid or expired reset link")
+    if len(request.new_password) < 8:
+        raise HTTPException(status_code=422, detail="Min 8 characters")
+    user.password_hash = get_password_hash(request.new_password)
+    user.password_reset_token = None
+    user.password_reset_expires = None
+    db.commit()
+    return {"message": "Password updated. You can login."}
+
+
+@router.post("/verify-password")
+async def verify_current_password(
+    request: VerifyPasswordRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Re-auth for sensitive screens (payment settings)."""
+    if not verify_password(request.password, current_user.password_hash):
+        raise HTTPException(status_code=400, detail="Incorrect password")
+    return {"verified": True}
+

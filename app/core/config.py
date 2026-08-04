@@ -79,7 +79,7 @@ class Settings(BaseSettings):
 
     # Featured product hero placement (platform fee paid via M-Pesa)
     FEATURE_PRODUCT_FEE_KES: int = Field(default=500)
-    FEATURE_PRODUCT_DAYS: int = Field(default=7)
+    FEATURE_PRODUCT_DAYS: int = Field(default=30)
 
     # Resend transactional email
     RESEND_API_KEY: str = Field(default="")

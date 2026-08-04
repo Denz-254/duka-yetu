@@ -7,6 +7,7 @@ import {
   FaInfoCircle, FaCheckCircle
 } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
+import Modal from '../components/common/Modal';
 import { business } from '../api/endpoints';
 
 const ReceiptSettingsPage = () => {
@@ -107,13 +108,14 @@ const ReceiptSettingsPage = () => {
     setTemplateForm({ name: '', type: 'standard', content: '', is_default: false });
   };
 
-  const handleDeleteTemplate = async (id) => {
-    if (window.confirm('Are you sure you want to delete this template?')) {
-      const updated = { ...settings, templates: settings.templates.filter((template) => template.id !== id) };
-      setSettings(updated);
-      await business.updateSettings('receipt', updated);
-      toast.success('Template deleted successfully');
-    }
+  const [deleteTemplateId, setDeleteTemplateId] = useState(null);
+  const handleDeleteTemplate = async () => {
+    if (!deleteTemplateId) return;
+    const updated = { ...settings, templates: settings.templates.filter((template) => template.id !== deleteTemplateId) };
+    setSettings(updated);
+    await business.updateSettings('receipt', updated);
+    toast.success('Template deleted successfully');
+    setDeleteTemplateId(null);
   };
 
   const formatTypes = [
@@ -422,7 +424,7 @@ const ReceiptSettingsPage = () => {
                     </button>
                     {!template.is_default && (
                       <button
-                        onClick={() => handleDeleteTemplate(template.id)}
+                        onClick={() => setDeleteTemplateId(template.id)}
                         className="p-1 text-gray-400 hover:text-red-500 rounded transition-colors"
                       >
                         <FaTrash />
@@ -530,6 +532,9 @@ const ReceiptSettingsPage = () => {
           </motion.div>
         </div>
       )}
+      <Modal open={!!deleteTemplateId} title="Delete template" confirmLabel="Delete" danger onClose={() => setDeleteTemplateId(null)} onConfirm={handleDeleteTemplate}>
+        Are you sure you want to delete this template?
+      </Modal>
     </div>
   );
 };

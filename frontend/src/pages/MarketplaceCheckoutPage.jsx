@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { FaArrowLeft, FaDownload, FaMobileAlt } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
 import api from '../api/client';
 import useMarketCartStore from '../store/marketCartStore';
+import useAuthStore from '../store/authStore';
 import { formatCurrency } from '../utils/helpers';
+import Seo from '../components/common/Seo';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const shortErr = (e) => {
@@ -13,22 +15,41 @@ const shortErr = (e) => {
 };
 
 const MarketplaceCheckoutPage = () => {
+  const user = useAuthStore((s) => s.user);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const { items, updateQuantity, removeItem, clearCart, total } = useMarketCartStore();
   const [form, setForm] = useState({
-    customer_name: '',
-    customer_phone: '',
-    customer_email: '',
+    customer_name: user?.name || '',
+    customer_phone: user?.phone || '',
+    customer_email: user?.email || '',
     delivery_address: '',
   });
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('');
   const [orderResult, setOrderResult] = useState(null);
 
+  // Must register / login as shopper (or any user) before paying online
+  if (!isAuthenticated) {
+    return <Navigate to="/shop/register" replace state={{ from: '/shop/checkout' }} />;
+  }
+
   const sellers = [...new Set(items.map((item) => item.business_id))];
 
-  const downloadInvoice = () => {
+  const downloadInvoice = async () => {
     if (!orderResult?.order_id) return;
-    window.open(`/api/v1/marketplace/orders/${orderResult.order_id}/invoice`, '_blank');
+    try {
+      const res = await api.get(`/marketplace/orders/${orderResult.order_id}/invoice`, {
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'text/html' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `invoice-${orderResult.order_number || 'order'}.html`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      toast.error('Invoice download failed');
+    }
   };
 
   const pay = async () => {
@@ -77,6 +98,7 @@ const MarketplaceCheckoutPage = () => {
   if (orderResult) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <Seo title="Order paid | DukaMall" path="/shop/checkout" noIndex />
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 max-w-md w-full text-center">
           <h1 className="text-2xl font-bold text-green-700">Order Paid</h1>
           <p className="text-gray-600 mt-2">{orderResult.order_number}</p>
@@ -103,10 +125,15 @@ const MarketplaceCheckoutPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <Seo title="Checkout | DukaMall" description="Pay securely with M-Pesa on DukaMall." path="/shop/checkout" />
       <div className="max-w-5xl mx-auto px-4 py-6">
         <Link to="/shop" className="inline-flex items-center gap-2 text-gray-600 mb-4">
           <FaArrowLeft /> Back to shop
         </Link>
+        <p className="text-xs text-gray-500 mb-3">
+          Signed in as {user?.name || user?.email} ·{' '}
+          <Link to="/shop/register" className="text-primary-600">Shopper accounts</Link>
+        </p>
         <div className="grid md:grid-cols-5 gap-4">
           <div className="md:col-span-3 bg-white rounded-lg shadow-sm border border-gray-100 p-4 space-y-3">
             <h2 className="font-bold text-gray-800">Cart ({items.length})</h2>

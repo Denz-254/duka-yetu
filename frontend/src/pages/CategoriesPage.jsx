@@ -6,12 +6,14 @@ import {
 } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
 import { categories as categoriesApi } from '../api/endpoints';
+import Modal from '../components/common/Modal';
 
 const CategoriesPage = () => {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [deleteId, setDeleteId] = useState(null);
   const [editingCategory, setEditingCategory] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
@@ -58,15 +60,15 @@ const CategoriesPage = () => {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm('Delete this category?')) {
-      try {
-        await categoriesApi.delete(id);
-        toast.success('Category deleted');
-        fetchCategories();
-      } catch (error) {
-        toast.error('Delete failed');
-      }
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    try {
+      await categoriesApi.delete(deleteId);
+      toast.success('Category deleted');
+      setDeleteId(null);
+      fetchCategories();
+    } catch (error) {
+      toast.error('Delete failed');
     }
   };
 
@@ -152,7 +154,7 @@ const CategoriesPage = () => {
                     <FaEdit />
                   </button>
                   <button
-                    onClick={() => handleDelete(category.id)}
+                    onClick={() => setDeleteId(category.id)}
                     className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                   >
                     <FaTrash />
@@ -235,6 +237,17 @@ const CategoriesPage = () => {
           </motion.div>
         </div>
       )}
+
+      <Modal
+        open={!!deleteId}
+        title="Delete category"
+        confirmLabel="Delete"
+        danger
+        onClose={() => setDeleteId(null)}
+        onConfirm={handleDelete}
+      >
+        Are you sure you want to delete this category?
+      </Modal>
     </div>
   );
 };

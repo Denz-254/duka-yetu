@@ -85,6 +85,15 @@ def ensure_schema_patches(db: Session) -> None:
         db.commit()
         print("Schema patch: users.locked_until added")
 
+    if not _column_exists(db, "users", "password_reset_token"):
+        db.execute(text("ALTER TABLE users ADD COLUMN password_reset_token VARCHAR(128)"))
+        db.commit()
+        print("Schema patch: users.password_reset_token added")
+    if not _column_exists(db, "users", "password_reset_expires"):
+        db.execute(text("ALTER TABLE users ADD COLUMN password_reset_expires TIMESTAMP"))
+        db.commit()
+        print("Schema patch: users.password_reset_expires added")
+
 
 def ensure_super_admin(db: Session) -> None:
     """Create or refresh the platform super-admin account from env credentials."""

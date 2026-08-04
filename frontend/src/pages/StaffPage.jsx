@@ -4,6 +4,7 @@ import { FaPlus, FaSearch, FaEdit, FaTrash, FaUserPlus, FaUserMinus, FaKey, FaTi
 import { toast } from 'react-hot-toast';
 import useAuthStore from '../store/authStore';
 import api from '../api/client';
+import Modal from '../components/common/Modal';
 
 const StaffPage = () => {
   const [staff, setStaff] = useState([]);
@@ -11,6 +12,9 @@ const StaffPage = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingStaff, setEditingStaff] = useState(null);
   const [search, setSearch] = useState('');
+  const [deleteId, setDeleteId] = useState(null);
+  const [resetModal, setResetModal] = useState({ open: false, id: null });
+  const [newPassword, setNewPassword] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -81,31 +85,31 @@ const StaffPage = () => {
     }
   };
 
-  const handleResetPassword = async (staffId) => {
-    const newPassword = prompt('Enter new password for staff member:');
-    if (newPassword && newPassword.length >= 8) {
-      try {
-        await api.post(`/users/${staffId}/reset-password`, { new_password: newPassword });
-        toast.success('Password reset successfully');
-      } catch (error) {
-        console.error('Reset password error:', error);
-        toast.error('Failed to reset password');
-      }
-    } else if (newPassword) {
+  const handleResetPassword = async () => {
+    if (!resetModal.id) return;
+    if (!newPassword || newPassword.length < 8) {
       toast.error('Password must be at least 8 characters');
+      return;
+    }
+    try {
+      await api.post(`/users/${resetModal.id}/reset-password`, { new_password: newPassword });
+      toast.success('Password reset successfully');
+      setResetModal({ open: false, id: null });
+      setNewPassword('');
+    } catch (error) {
+      toast.error('Failed to reset password');
     }
   };
 
-  const handleDelete = async (staffId) => {
-    if (window.confirm('Are you sure you want to delete this staff member?')) {
-      try {
-        await api.delete(`/users/${staffId}`);
-        toast.success('Staff deleted successfully');
-        fetchStaff();
-      } catch (error) {
-        console.error('Delete staff error:', error);
-        toast.error('Failed to delete staff');
-      }
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    try {
+      await api.delete(`/users/${deleteId}`);
+      toast.success('Staff deleted successfully');
+      setDeleteId(null);
+      fetchStaff();
+    } catch (error) {
+      toast.error('Failed to delete staff');
     }
   };
 
@@ -233,7 +237,7 @@ const StaffPage = () => {
                           {member.is_active ? <FaUserMinus /> : <FaUserPlus />}
                         </button>
                         <button
-                          onClick={() => handleResetPassword(member.id)}
+                          onClick={() => setResetModal({ open: true, id: member.id })}
                           className="p-1 text-yellow-500 hover:text-yellow-600"
                           title="Reset Password"
                         >
@@ -241,7 +245,7 @@ const StaffPage = () => {
                         </button>
                         {member.role !== 'OWNER' && (
                           <button
-                            onClick={() => handleDelete(member.id)}
+                            onClick={() => setDeleteId(member.id)}
                             className="p-1 text-red-500 hover:text-red-600"
                             title="Delete"
                           >
@@ -386,6 +390,25 @@ const StaffPage = () => {
           </motion.div>
         </div>
       )}
+
+      <Modal open={!!deleteId} title="Delete staff" confirmLabel="Delete" danger onClose={() => setDeleteId(null)} onConfirm={handleDelete}>
+        Are you sure you want to delete this staff member?
+      </Modal>
+      <Modal
+        open={resetModal.open}
+        title="Reset password"
+        confirmLabel="Reset"
+        onClose={() => { setResetModal({ open: false, id: null }); setNewPassword(''); }}
+        onConfirm={handleResetPassword}
+      >
+        <input
+          type="password"
+          className="input-primary w-full"
+          placeholder="New password (min 8)"
+          value={newPassword}
+          onChange={(e) => setNewPassword(e.target.value)}
+        />
+      </Modal>
     </div>
   );
 };

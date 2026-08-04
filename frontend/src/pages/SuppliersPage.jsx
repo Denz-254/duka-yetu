@@ -9,6 +9,7 @@ import {
 import { toast } from 'react-hot-toast';
 import { suppliers as suppliersApi } from '../api/endpoints';
 import { formatCurrency } from '../utils/helpers';
+import Modal from '../components/common/Modal';
 
 const SuppliersPage = () => {
   const [suppliers, setSuppliers] = useState([]);
@@ -18,6 +19,7 @@ const SuppliersPage = () => {
   const [editingSupplier, setEditingSupplier] = useState(null);
   const [selectedSupplier, setSelectedSupplier] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [deleteId, setDeleteId] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     contact_name: '',
@@ -85,15 +87,15 @@ const SuppliersPage = () => {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this supplier?')) {
-      try {
-        await suppliersApi.delete(id);
-        toast.success('Supplier deleted successfully');
-        fetchSuppliers();
-      } catch (error) {
-        toast.error('Failed to delete supplier');
-      }
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    try {
+      await suppliersApi.delete(deleteId);
+      toast.success('Supplier deleted successfully');
+      setDeleteId(null);
+      fetchSuppliers();
+    } catch (error) {
+      toast.error('Failed to delete supplier');
     }
   };
 
@@ -518,6 +520,9 @@ const SuppliersPage = () => {
           </motion.div>
         </div>
       )}
+      <Modal open={!!deleteId} title="Delete supplier" confirmLabel="Delete" danger onClose={() => setDeleteId(null)} onConfirm={handleDelete}>
+        Are you sure you want to delete this supplier?
+      </Modal>
     </div>
   );
 };

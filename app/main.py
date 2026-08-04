@@ -8,7 +8,7 @@ from datetime import datetime
 
 from app.core.config import settings
 from app.core.database import init_db, engine, SessionLocal
-from app.api import auth, products, sales, dashboard, upload, subscription, resources, payments, admin, marketplace, orders
+from app.api import auth, products, sales, dashboard, upload, subscription, resources, payments, admin, marketplace, orders, reports
 from app.core.bootstrap import ensure_schema_patches, ensure_super_admin
 from app.core.dependencies import require_feature
 from app.domains.users.routes import router as users_router
@@ -122,6 +122,12 @@ app.include_router(resources.router, prefix="/api/v1", tags=["Business Resources
 app.include_router(payments.router, prefix="/api/v1/payments", tags=["Payments"])
 app.include_router(admin.router, prefix="/api/v1/admin", tags=["Super Admin"])
 app.include_router(marketplace.router, prefix="/api/v1/marketplace", tags=["Marketplace"])
+app.include_router(
+    reports.router,
+    prefix="/api/v1/reports",
+    tags=["Reports"],
+    dependencies=[Depends(require_feature("basic_reports"))],
+)
 app.include_router(
     orders.router,
     prefix="/api/v1/orders",

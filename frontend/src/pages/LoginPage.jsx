@@ -21,6 +21,11 @@ const LoginPage = () => {
         navigate('/admin');
         return;
       }
+      if (result.user?.role === 'SHOPPER') {
+        toast.success(result.message || 'Welcome back');
+        navigate('/shop');
+        return;
+      }
       if (result.business?.approval_status && result.business.approval_status !== 'APPROVED') {
         toast(result.message || 'Awaiting approval');
         navigate('/pending-approval');
@@ -81,6 +86,12 @@ const LoginPage = () => {
               </div>
             </div>
 
+            <div className="mb-2 text-right">
+              <Link to="/forgot-password" className="text-sm text-primary-600 hover:text-primary-700">
+                Forgot password?
+              </Link>
+            </div>
+
             <button
               type="submit"
               disabled={loading}
@@ -90,11 +101,17 @@ const LoginPage = () => {
             </button>
           </form>
 
-          <div className="mt-4 text-center">
+          <div className="mt-4 text-center space-y-2">
             <p className="text-gray-600">
-              Don't have an account?{' '}
+              Business owner?{' '}
               <Link to="/register" className="text-primary-600 hover:text-primary-700 font-medium">
-                Register
+                Register shop
+              </Link>
+            </p>
+            <p className="text-gray-600 text-sm">
+              Shopping online?{' '}
+              <Link to="/shop/register" className="text-primary-600 hover:text-primary-700 font-medium">
+                Create shopper account
               </Link>
             </p>
           </div>

@@ -11,6 +11,7 @@ import useAuthStore from '../store/authStore';
 import ProductForm from '../components/products/ProductForm';
 import { products as productsApi } from '../api/endpoints';
 import { formatCurrency } from '../utils/helpers';
+import Modal from '../components/common/Modal';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -24,6 +25,7 @@ const ProductsPage = () => {
   const [featurePhone, setFeaturePhone] = useState('');
   const [featureBadge, setFeatureBadge] = useState('Save 30%');
   const [featuring, setFeaturing] = useState(false);
+  const [deleteId, setDeleteId] = useState(null);
   const { products, loading, fetchProducts, deleteProduct, searchProducts } = useProductStore();
   const user = useAuthStore((state) => state.user);
   const isOwner = user?.role === 'OWNER';
@@ -74,14 +76,14 @@ const ProductsPage = () => {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this product?')) {
-      try {
-        await deleteProduct(id);
-        toast.success('Product deleted');
-      } catch (error) {
-        toast.error('Delete failed');
-      }
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    try {
+      await deleteProduct(deleteId);
+      toast.success('Product deleted');
+      setDeleteId(null);
+    } catch (error) {
+      toast.error('Delete failed');
     }
   };
 
@@ -292,7 +294,7 @@ const ProductsPage = () => {
                           </button>
                           {isOwner && (
                             <button
-                              onClick={() => handleDelete(product.id)}
+                              onClick={() => setDeleteId(product.id)}
                               className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                               title="Delete"
                             >
@@ -403,6 +405,17 @@ const ProductsPage = () => {
           </div>
         </div>
       )}
+
+      <Modal
+        open={!!deleteId}
+        title="Delete product"
+        confirmLabel="Delete"
+        danger
+        onClose={() => setDeleteId(null)}
+        onConfirm={handleDelete}
+      >
+        Are you sure you want to delete this product?
+      </Modal>
     </div>
   );
 };

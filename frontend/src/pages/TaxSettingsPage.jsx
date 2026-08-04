@@ -6,6 +6,7 @@ import {
   FaCheckCircle, FaTimes, FaCalendarAlt, FaCalculator
 } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
+import Modal from '../components/common/Modal';
 import { business } from '../api/endpoints';
 
 const TaxSettingsPage = () => {
@@ -197,12 +198,14 @@ const TaxSettingsPage = () => {
     });
   };
 
-  const handleDelete = async (type, id) => {
-    if (window.confirm('Are you sure you want to delete this?')) {
-      const key = type === 'rate' ? 'tax_rates' : type === 'rule' ? 'tax_rules' : 'exemptions';
-      await persistSettings({ ...settings, [key]: settings[key].filter((item) => item.id !== id) });
-      toast.success('Deleted successfully');
-    }
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    const { type, id } = deleteTarget;
+    const key = type === 'rate' ? 'tax_rates' : type === 'rule' ? 'tax_rules' : 'exemptions';
+    await persistSettings({ ...settings, [key]: settings[key].filter((item) => item.id !== id) });
+    toast.success('Deleted successfully');
+    setDeleteTarget(null);
   };
 
   const taxTypes = [
@@ -337,7 +340,7 @@ const TaxSettingsPage = () => {
                       <FaEdit />
                     </button>
                     <button
-                      onClick={() => handleDelete('rate', tax.id)}
+                      onClick={() => setDeleteTarget({ type: 'rate', id: tax.id })}
                       className="p-1 text-gray-400 hover:text-red-500 rounded transition-colors"
                     >
                       <FaTrash />
@@ -420,7 +423,7 @@ const TaxSettingsPage = () => {
                             <FaEdit />
                           </button>
                           <button
-                            onClick={() => handleDelete('rule', rule.id)}
+                            onClick={() => setDeleteTarget({ type: 'rule', id: rule.id })}
                             className="p-1 text-gray-400 hover:text-red-500 rounded transition-colors"
                           >
                             <FaTrash />
@@ -494,7 +497,7 @@ const TaxSettingsPage = () => {
                       <FaEdit />
                     </button>
                     <button
-                      onClick={() => handleDelete('exemption', exemption.id)}
+                      onClick={() => setDeleteTarget({ type: 'exemption', id: exemption.id })}
                       className="p-1 text-gray-400 hover:text-red-500 rounded transition-colors"
                     >
                       <FaTrash />
@@ -790,6 +793,9 @@ const TaxSettingsPage = () => {
           </motion.div>
         </div>
       )}
+      <Modal open={!!deleteTarget} title="Confirm delete" confirmLabel="Delete" danger onClose={() => setDeleteTarget(null)} onConfirm={handleDelete}>
+        Are you sure you want to delete this?
+      </Modal>
     </div>
   );
 };

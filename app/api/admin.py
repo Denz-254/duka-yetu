@@ -1,14 +1,16 @@
 """Super-admin platform management routes."""
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import desc, func, or_
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.dependencies import require_super_admin
 from app.models.business import Business
@@ -16,6 +18,7 @@ from app.models.online_order import Notification, OnlineOrder
 from app.models.product import Product
 from app.models.sale import Sale
 from app.models.user import User
+from app.utils.invoice_generator import generate_platform_subscription_invoice_html
 
 router = APIRouter()
 
@@ -35,6 +38,10 @@ class AdminBusinessItem(BaseModel):
     approved_at: Optional[datetime] = None
     products_count: int = 0
     sales_count: int = 0
+    sales_revenue: float = 0
+    online_orders: int = 0
+    online_revenue: float = 0
+    platform_commission: float = 0
 
 
 class AdminOverview(BaseModel):
@@ -44,6 +51,11 @@ class AdminOverview(BaseModel):
     rejected_businesses: int
     total_sales: int
     total_products: int
+    pos_revenue: float = 0
+    marketplace_revenue: float = 0
+    platform_commission: float = 0
+    featured_active: int = 0
+    shoppers: int = 0
 
 
 class ApprovalRequest(BaseModel):
@@ -59,6 +71,30 @@ def admin_overview(
     pending = db.query(Business).filter(Business.approval_status == "PENDING").count()
     approved = db.query(Business).filter(Business.approval_status == "APPROVED").count()
     rejected = db.query(Business).filter(Business.approval_status == "REJECTED").count()
+    pos_revenue = float(
+        db.query(func.coalesce(func.sum(Sale.total_amount), 0)).scalar() or 0
+    )
+    market_paid = db.query(OnlineOrder).filter(OnlineOrder.payment_status == "PAID")
+    marketplace_revenue = float(
+        market_paid.with_entities(func.coalesce(func.sum(OnlineOrder.total_amount), 0)).scalar()
+        or 0
+    )
+    platform_commission = float(
+        market_paid.with_entities(
+            func.coalesce(func.sum(OnlineOrder.commission_amount), 0)
+        ).scalar()
+        or 0
+    )
+    now = datetime.utcnow()
+    featured_active = (
+        db.query(Product)
+        .filter(
+            Product.is_featured == True,  # noqa: E712
+            or_(Product.featured_until == None, Product.featured_until >= now),  # noqa: E711
+        )
+        .count()
+    )
+    shoppers = db.query(User).filter(User.role == "SHOPPER").count()
     return AdminOverview(
         total_businesses=total,
         pending_businesses=pending,
@@ -66,6 +102,11 @@ def admin_overview(
         rejected_businesses=rejected,
         total_sales=db.query(Sale).count(),
         total_products=db.query(Product).filter(Product.is_active == True).count(),  # noqa: E712
+        pos_revenue=round(pos_revenue, 2),
+        marketplace_revenue=round(marketplace_revenue, 2),
+        platform_commission=round(platform_commission, 2),
+        featured_active=featured_active,
+        shoppers=shoppers,
     )
 
 
@@ -88,6 +129,36 @@ def list_businesses(
         sales_count = db.query(func.count(Sale.id)).filter(
             Sale.business_id == business.id
         ).scalar() or 0
+        sales_revenue = float(
+            db.query(func.coalesce(func.sum(Sale.total_amount), 0))
+            .filter(Sale.business_id == business.id)
+            .scalar()
+            or 0
+        )
+        online_orders = (
+            db.query(func.count(OnlineOrder.id))
+            .filter(OnlineOrder.business_id == business.id)
+            .scalar()
+            or 0
+        )
+        online_revenue = float(
+            db.query(func.coalesce(func.sum(OnlineOrder.total_amount), 0))
+            .filter(
+                OnlineOrder.business_id == business.id,
+                OnlineOrder.payment_status == "PAID",
+            )
+            .scalar()
+            or 0
+        )
+        commission = float(
+            db.query(func.coalesce(func.sum(OnlineOrder.commission_amount), 0))
+            .filter(
+                OnlineOrder.business_id == business.id,
+                OnlineOrder.payment_status == "PAID",
+            )
+            .scalar()
+            or 0
+        )
         items.append(
             AdminBusinessItem(
                 id=str(business.id),
@@ -104,6 +175,10 @@ def list_businesses(
                 approved_at=business.approved_at,
                 products_count=products_count,
                 sales_count=sales_count,
+                sales_revenue=round(sales_revenue, 2),
+                online_orders=online_orders,
+                online_revenue=round(online_revenue, 2),
+                platform_commission=round(commission, 2),
             )
         )
     return items
@@ -224,7 +299,7 @@ def reject_business(
 
 
 class FeatureAdminRequest(BaseModel):
-    days: int = Field(7, ge=1, le=90)
+    days: int = Field(30, ge=1, le=90)
     badge_text: Optional[str] = Field(None, max_length=50)
 
 
@@ -240,7 +315,15 @@ class AdminProductItem(BaseModel):
     is_featured: bool = False
     featured_until: Optional[datetime] = None
     featured_badge: Optional[str] = None
+    days_remaining: Optional[int] = None
     is_active: bool = True
+
+
+def _days_remaining(until: Optional[datetime]) -> Optional[int]:
+    if not until:
+        return None
+    days = (until.date() - datetime.utcnow().date()).days
+    return max(0, days)
 
 
 @router.get("/products", response_model=List[AdminProductItem])
@@ -288,10 +371,92 @@ def admin_list_products(
             is_featured=bool(p.is_featured),
             featured_until=p.featured_until,
             featured_badge=p.featured_badge,
+            days_remaining=_days_remaining(p.featured_until) if p.is_featured else None,
             is_active=bool(p.is_active),
         )
         for p, b in rows
     ]
+
+
+@router.get("/analytics")
+def admin_analytics(
+    db: Session = Depends(get_db),
+    current: User = Depends(require_super_admin),
+):
+    """Platform-wide revenue and business performance for the super-admin dashboard."""
+    overview = admin_overview(db=db, _=current)
+    items = list_businesses(db=db, _=current, approval_status=None)
+    ranked = sorted(
+        [i.model_dump() if hasattr(i, "model_dump") else i.dict() for i in items],
+        key=lambda x: (x.get("sales_revenue", 0) + x.get("online_revenue", 0)),
+        reverse=True,
+    )
+    now = datetime.utcnow()
+    featured_rows = (
+        db.query(Product, Business)
+        .join(Business, Business.id == Product.business_id)
+        .filter(
+            Product.is_featured == True,  # noqa: E712
+            or_(Product.featured_until == None, Product.featured_until >= now),  # noqa: E711
+        )
+        .order_by(Product.featured_until.asc())
+        .limit(50)
+        .all()
+    )
+    featured = [
+        {
+            "id": str(p.id),
+            "name": p.name,
+            "business_name": b.name,
+            "featured_until": p.featured_until,
+            "days_remaining": _days_remaining(p.featured_until),
+            "featured_badge": p.featured_badge,
+        }
+        for p, b in featured_rows
+    ]
+    return {
+        "overview": overview.model_dump() if hasattr(overview, "model_dump") else overview.dict(),
+        "businesses": ranked,
+        "featured_placements": featured,
+    }
+
+
+@router.get("/businesses/{business_id}/subscription-invoice")
+def admin_subscription_invoice(
+    business_id: UUID,
+    billing_cycle: str = Query("monthly", pattern="^(monthly|yearly)$"),
+    db: Session = Depends(get_db),
+    _: User = Depends(require_super_admin),
+):
+    """Generate a downloadable subscription invoice for a business (end-of-month billing)."""
+    business = db.query(Business).filter(Business.id == business_id).first()
+    if not business:
+        raise HTTPException(status_code=404, detail="Business not found")
+    plan = (business.package or "BASIC").upper()
+    price_map = {
+        ("BASIC", "monthly"): settings.PLAN_BASIC_MONTHLY_KES,
+        ("BASIC", "yearly"): settings.PLAN_BASIC_YEARLY_KES,
+        ("PROFESSIONAL", "monthly"): settings.PLAN_PROFESSIONAL_MONTHLY_KES,
+        ("PROFESSIONAL", "yearly"): settings.PLAN_PROFESSIONAL_YEARLY_KES,
+        ("ENTERPRISE", "monthly"): settings.PLAN_ENTERPRISE_MONTHLY_KES,
+        ("ENTERPRISE", "yearly"): settings.PLAN_ENTERPRISE_YEARLY_KES,
+    }
+    amount = float(price_map.get((plan, billing_cycle), settings.PLAN_BASIC_MONTHLY_KES))
+    now = datetime.utcnow()
+    period_label = now.strftime("%B %Y") if billing_cycle == "monthly" else now.strftime("%Y")
+    inv_no = f"SUB-{str(business.id)[:8].upper()}-{now.strftime('%Y%m')}"
+    html = generate_platform_subscription_invoice_html(
+        business,
+        plan=plan,
+        amount=amount,
+        billing_cycle=billing_cycle,
+        invoice_number=inv_no,
+        period_label=period_label,
+    )
+    return HTMLResponse(
+        content=html,
+        headers={"Content-Disposition": f'attachment; filename="{inv_no}.html"'},
+    )
 
 
 @router.post("/featured/{product_id}", response_model=AdminProductItem)
@@ -330,6 +495,7 @@ def admin_feature_product(
         is_featured=True,
         featured_until=product.featured_until,
         featured_badge=product.featured_badge,
+        days_remaining=_days_remaining(product.featured_until),
         is_active=bool(product.is_active),
     )
 
