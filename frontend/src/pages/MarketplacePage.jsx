@@ -33,50 +33,53 @@ function useHorizontalScroll() {
   return { ref, scrollBy };
 }
 
-const ProductCard = ({ product, onAdd, wide = false }) => (
-  <article
-    className={`bg-white rounded-2xl border border-gray-100 overflow-hidden group hover:shadow-md transition-shadow ${
-      wide ? 'w-[160px] sm:w-[200px] md:w-[220px]' : 'w-[160px] sm:w-[200px] md:w-[220px]'
-    }`}
-  >
-    <div className="relative aspect-[4/5] bg-gray-50">
-      <Link to={`/shop/product/${product.id}`} className="block h-full">
-        {product.image_url ? (
-          <img
-            src={product.image_url}
-            alt={product.name}
-            className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-primary-200">
-            <FaStore className="text-4xl" />
-          </div>
+const ProductCard = ({ product, onAdd }) => (
+  <article className="w-[156px] sm:w-[180px] md:w-[196px] shrink-0 group">
+    <div className="relative bg-white rounded-3xl shadow-[0_4px_20px_rgba(0,0,0,0.06)] border border-gray-100/80 overflow-hidden transition-all duration-300 group-hover:shadow-[0_8px_28px_rgba(5,150,105,0.12)] group-hover:-translate-y-0.5">
+      {/* Soft square media zone */}
+      <div className="relative mx-2.5 mt-2.5 mb-0 rounded-2xl overflow-hidden bg-gradient-to-b from-primary-50 to-gray-50 aspect-square">
+        <Link to={`/shop/product/${product.id}`} className="absolute inset-0 flex items-center justify-center p-3">
+          {product.image_url ? (
+            <img
+              src={product.image_url}
+              alt={product.name}
+              className="max-w-full max-h-full object-contain drop-shadow-sm group-hover:scale-105 transition-transform duration-500"
+            />
+          ) : (
+            <FaStore className="text-3xl text-primary-200" />
+          )}
+        </Link>
+        {product.featured_badge && (
+          <span className="absolute top-2 left-2 z-[1] bg-primary-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-full tracking-wide uppercase">
+            {product.featured_badge}
+          </span>
         )}
-      </Link>
-      {product.featured_badge && (
-        <span className="absolute top-2 left-2 bg-primary-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-md">
-          {product.featured_badge}
-        </span>
-      )}
-      <button
-        type="button"
-        onClick={() => onAdd(product)}
-        className="absolute bottom-2 right-2 w-9 h-9 rounded-full bg-white shadow-md flex items-center justify-center text-gray-700 hover:bg-primary-600 hover:text-white transition"
-        title="Add to cart"
-      >
-        <FaShoppingCart className="text-sm" />
-      </button>
-    </div>
-    <div className="p-3">
-      <p className="text-[10px] uppercase tracking-wide text-gray-400 truncate">
-        {product.category_name || product.business_name}
-      </p>
-      <Link to={`/shop/product/${product.id}`}>
-        <h3 className="font-semibold text-gray-900 text-sm line-clamp-2 min-h-[2.5rem] hover:text-primary-600">
-          {product.name}
-        </h3>
-      </Link>
-      <p className="text-sm font-bold text-gray-900 mt-1.5">{formatCurrency(product.selling_price)}</p>
+        {/* Circular add — Nike-card style */}
+        <button
+          type="button"
+          onClick={() => onAdd(product)}
+          className="absolute -bottom-3 right-2 z-[2] w-10 h-10 rounded-full bg-primary-600 text-white shadow-lg shadow-primary-600/30 flex items-center justify-center hover:bg-primary-700 active:scale-95 transition"
+          title="Add to cart"
+        >
+          <FaShoppingCart className="text-sm" />
+        </button>
+      </div>
+
+      <div className="px-3.5 pt-5 pb-3.5">
+        <p className="text-[10px] font-medium uppercase tracking-wider text-primary-600/80 truncate">
+          {product.category_name || product.business_name || 'DukaMall'}
+        </p>
+        <Link to={`/shop/product/${product.id}`}>
+          <h3 className="mt-0.5 font-semibold text-gray-900 text-[13px] leading-snug line-clamp-1 hover:text-primary-700">
+            {product.name}
+          </h3>
+        </Link>
+        <div className="mt-2 flex items-end justify-between gap-2">
+          <p className="text-[15px] font-bold text-gray-900 tracking-tight">
+            {formatCurrency(product.selling_price)}
+          </p>
+        </div>
+      </div>
     </div>
   </article>
 );
