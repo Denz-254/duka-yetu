@@ -6,7 +6,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy import desc, func
+from sqlalchemy import desc, func, or_
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -221,3 +221,131 @@ def reject_business(
         products_count=0,
         sales_count=0,
     )
+
+
+class FeatureAdminRequest(BaseModel):
+    days: int = Field(7, ge=1, le=90)
+    badge_text: Optional[str] = Field(None, max_length=50)
+
+
+class AdminProductItem(BaseModel):
+    id: str
+    name: str
+    sku: str
+    selling_price: float
+    stock_quantity: int
+    image_url: Optional[str] = None
+    business_id: str
+    business_name: str
+    is_featured: bool = False
+    featured_until: Optional[datetime] = None
+    featured_badge: Optional[str] = None
+    is_active: bool = True
+
+
+@router.get("/products", response_model=List[AdminProductItem])
+def admin_list_products(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_super_admin),
+    q: Optional[str] = Query(None),
+    featured_only: bool = Query(False),
+    limit: int = Query(50, ge=1, le=100),
+):
+    """Search products for hero featuring (paid placements)."""
+    from datetime import datetime as dt
+
+    query = (
+        db.query(Product, Business)
+        .join(Business, Business.id == Product.business_id)
+        .filter(Product.is_active == True)  # noqa: E712
+    )
+    if featured_only:
+        now = dt.utcnow()
+        query = query.filter(
+            Product.is_featured == True,  # noqa: E712
+            or_(Product.featured_until == None, Product.featured_until >= now),  # noqa: E711
+        )
+    if q:
+        like = f"%{q.strip()}%"
+        query = query.filter(
+            or_(
+                Product.name.ilike(like),
+                Product.sku.ilike(like),
+                Business.name.ilike(like),
+            )
+        )
+    rows = query.order_by(desc(Product.created_at)).limit(limit).all()
+    return [
+        AdminProductItem(
+            id=str(p.id),
+            name=p.name,
+            sku=p.sku,
+            selling_price=float(p.selling_price),
+            stock_quantity=p.stock_quantity,
+            image_url=p.image_url,
+            business_id=str(b.id),
+            business_name=b.name,
+            is_featured=bool(p.is_featured),
+            featured_until=p.featured_until,
+            featured_badge=p.featured_badge,
+            is_active=bool(p.is_active),
+        )
+        for p, b in rows
+    ]
+
+
+@router.post("/featured/{product_id}", response_model=AdminProductItem)
+def admin_feature_product(
+    product_id: UUID,
+    payload: FeatureAdminRequest,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_super_admin),
+):
+    """Place a paid client's product into the store hero carousel."""
+    from datetime import timedelta
+
+    from app.core.config import settings
+
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    business = db.query(Business).filter(Business.id == product.business_id).first()
+    if not business or business.approval_status != "APPROVED":
+        raise HTTPException(status_code=400, detail="Business must be approved")
+
+    product.is_featured = True
+    product.featured_until = datetime.utcnow() + timedelta(days=payload.days or settings.FEATURE_PRODUCT_DAYS)
+    product.featured_badge = (payload.badge_text or product.featured_badge or "Featured")[:50]
+    db.commit()
+    db.refresh(product)
+    return AdminProductItem(
+        id=str(product.id),
+        name=product.name,
+        sku=product.sku,
+        selling_price=float(product.selling_price),
+        stock_quantity=product.stock_quantity,
+        image_url=product.image_url,
+        business_id=str(business.id),
+        business_name=business.name,
+        is_featured=True,
+        featured_until=product.featured_until,
+        featured_badge=product.featured_badge,
+        is_active=bool(product.is_active),
+    )
+
+
+@router.delete("/featured/{product_id}", status_code=204)
+def admin_unfeature_product(
+    product_id: UUID,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_super_admin),
+):
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    product.is_featured = False
+    product.featured_until = None
+    product.featured_badge = None
+    db.commit()
+    return None
+

@@ -1,34 +1,129 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   FaSearch, FaShoppingCart, FaStore, FaUser, FaHeart,
-  FaTruck, FaUndo, FaLock, FaShieldAlt, FaHeadset,
-  FaChevronRight, FaCreditCard, FaBoxOpen, FaCheckCircle,
+  FaTruck, FaUndo, FaShieldAlt, FaHeadset, FaChevronLeft,
+  FaChevronRight, FaLock, FaStar, FaMobileAlt, FaBars, FaTimes,
 } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import api from '../api/client';
 import useMarketCartStore from '../store/marketCartStore';
 import { formatCurrency } from '../utils/helpers';
 
-const TRUST_BAR = [
-  { icon: FaTruck, label: 'Free Shipping on Orders Over KES 2,000' },
-  { icon: FaUndo, label: '30-Day Money-Back Guarantee' },
-  { icon: FaHeadset, label: '24/7 Customer Support' },
-];
+const CAT_ICONS = [FaStore, FaHeart, FaMobileAlt, FaTruck, FaStar, FaShieldAlt];
 
-const HERO_TRUST = [
-  { icon: FaTruck, title: 'Free Shipping', sub: 'On selected orders' },
-  { icon: FaUndo, title: '30 Days Returns', sub: 'Hassle-free returns' },
-  { icon: FaLock, title: 'Secure Payment', sub: 'M-Pesa protected' },
-];
+const DEFAULT_HERO = {
+  id: null,
+  name: 'DukaMall online store',
+  description: 'Find quality products from verified Kenyan sellers. Pay securely with M-Pesa.',
+  image_url: null,
+  business_name: 'Duka Yetu',
+  featured_badge: 'New Collection',
+  selling_price: null,
+};
 
-const FOOTER_TRUST = [
-  { icon: FaShieldAlt, title: 'Secure Checkout' },
-  { icon: FaUndo, title: 'Easy Returns' },
-  { icon: FaCheckCircle, title: 'Quality Guarantee' },
-  { icon: FaTruck, title: 'Fast Delivery' },
-];
+function useHorizontalScroll() {
+  const ref = useRef(null);
+  const scrollBy = (dir) => {
+    if (!ref.current) return;
+    const amount = Math.min(ref.current.clientWidth * 0.8, 320);
+    ref.current.scrollBy({ left: dir * amount, behavior: 'smooth' });
+  };
+  return { ref, scrollBy };
+}
+
+const ProductCard = ({ product, onAdd, wide = false }) => (
+  <article
+    className={`bg-white rounded-2xl border border-gray-100 overflow-hidden group hover:shadow-md transition-shadow ${
+      wide ? 'w-[160px] sm:w-[200px] md:w-[220px]' : 'w-[160px] sm:w-[200px] md:w-[220px]'
+    }`}
+  >
+    <div className="relative aspect-[4/5] bg-gray-50">
+      <Link to={`/shop/product/${product.id}`} className="block h-full">
+        {product.image_url ? (
+          <img
+            src={product.image_url}
+            alt={product.name}
+            className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-primary-200">
+            <FaStore className="text-4xl" />
+          </div>
+        )}
+      </Link>
+      {product.featured_badge && (
+        <span className="absolute top-2 left-2 bg-primary-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-md">
+          {product.featured_badge}
+        </span>
+      )}
+      <button
+        type="button"
+        onClick={() => onAdd(product)}
+        className="absolute bottom-2 right-2 w-9 h-9 rounded-full bg-white shadow-md flex items-center justify-center text-gray-700 hover:bg-primary-600 hover:text-white transition"
+        title="Add to cart"
+      >
+        <FaShoppingCart className="text-sm" />
+      </button>
+    </div>
+    <div className="p-3">
+      <p className="text-[10px] uppercase tracking-wide text-gray-400 truncate">
+        {product.category_name || product.business_name}
+      </p>
+      <Link to={`/shop/product/${product.id}`}>
+        <h3 className="font-semibold text-gray-900 text-sm line-clamp-2 min-h-[2.5rem] hover:text-primary-600">
+          {product.name}
+        </h3>
+      </Link>
+      <p className="text-sm font-bold text-gray-900 mt-1.5">{formatCurrency(product.selling_price)}</p>
+    </div>
+  </article>
+);
+
+const ScrollRail = ({ title, products, onAdd, onViewAll }) => {
+  const { ref, scrollBy } = useHorizontalScroll();
+  if (!products?.length) return null;
+  return (
+    <section className="max-w-7xl mx-auto px-4 py-8">
+      <div className="flex items-center justify-between mb-4 gap-3">
+        <h2 className="text-xl md:text-2xl font-bold text-gray-900">{title}</h2>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => scrollBy(-1)}
+            className="w-9 h-9 rounded-full border border-gray-200 flex items-center justify-center text-gray-600 hover:border-primary-500 hover:text-primary-600"
+            aria-label="Scroll left"
+          >
+            <FaChevronLeft className="text-xs" />
+          </button>
+          <button
+            type="button"
+            onClick={() => scrollBy(1)}
+            className="w-9 h-9 rounded-full border border-gray-200 flex items-center justify-center text-gray-600 hover:border-primary-500 hover:text-primary-600"
+            aria-label="Scroll right"
+          >
+            <FaChevronRight className="text-xs" />
+          </button>
+          {onViewAll && (
+            <button
+              type="button"
+              onClick={onViewAll}
+              className="hidden sm:inline text-sm font-medium text-primary-600 hover:underline ml-1"
+            >
+              View All
+            </button>
+          )}
+        </div>
+      </div>
+      <div ref={ref} className="scroll-rail">
+        {products.map((p) => (
+          <ProductCard key={p.id} product={p} onAdd={onAdd} />
+        ))}
+      </div>
+    </section>
+  );
+};
 
 const MarketplacePage = () => {
   const [products, setProducts] = useState([]);
@@ -36,152 +131,271 @@ const MarketplacePage = () => {
   const [featured, setFeatured] = useState([]);
   const [q, setQ] = useState('');
   const [categoryId, setCategoryId] = useState('');
-  const [sort, setSort] = useState('newest');
   const [loading, setLoading] = useState(true);
+  const [heroIndex, setHeroIndex] = useState(0);
+  const [mobileNav, setMobileNav] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const addItem = useMarketCartStore((state) => state.addItem);
   const cartCount = useMarketCartStore((state) => state.items.length);
+  const catScroll = useHorizontalScroll();
 
-  const hero = featured[0] || null;
+  const heroSlides = useMemo(() => {
+    if (featured.length) return featured;
+    return [DEFAULT_HERO];
+  }, [featured]);
 
-  const loadProducts = async () => {
+  const activeSlide = heroSlides[heroIndex % heroSlides.length] || DEFAULT_HERO;
+
+  const loadProducts = useCallback(async (opts = {}) => {
     setLoading(true);
     try {
       const params = {
-        q: q || undefined,
-        category_id: categoryId || undefined,
+        q: opts.q !== undefined ? opts.q || undefined : q || undefined,
+        category_id: opts.categoryId !== undefined ? opts.categoryId || undefined : categoryId || undefined,
+        limit: 48,
       };
       const { data } = await api.get('/marketplace/products', { params });
-      let items = data.items || [];
-      if (sort === 'price_asc') items = [...items].sort((a, b) => a.selling_price - b.selling_price);
-      if (sort === 'price_desc') items = [...items].sort((a, b) => b.selling_price - a.selling_price);
-      if (sort === 'name') items = [...items].sort((a, b) => a.name.localeCompare(b.name));
-      setProducts(items);
+      setProducts(data.items || []);
     } catch {
       toast.error('Failed to load products');
     } finally {
       setLoading(false);
     }
-  };
+  }, [q, categoryId]);
 
   useEffect(() => {
     api.get('/marketplace/categories')
       .then(({ data }) => setCategories(data || []))
       .catch(() => setCategories([]));
-    api.get('/marketplace/featured')
+    api.get('/marketplace/featured', { params: { limit: 12 } })
       .then(({ data }) => setFeatured(data || []))
       .catch(() => setFeatured([]));
   }, []);
 
   useEffect(() => {
     loadProducts();
-  }, [categoryId, sort]);
+  }, [categoryId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-advance hero
+  useEffect(() => {
+    if (heroSlides.length < 2) return undefined;
+    const t = setInterval(() => {
+      setHeroIndex((i) => (i + 1) % heroSlides.length);
+    }, 5500);
+    return () => clearInterval(t);
+  }, [heroSlides.length]);
 
   const handleAdd = (product) => {
+    if (!product?.id) return;
     addItem(product);
     toast.success('Added to cart');
   };
 
+  const deals = products.slice(0, 12);
+  const recommended = products.length > 8
+    ? [...products].sort((a, b) => a.selling_price - b.selling_price).slice(0, 12)
+    : products;
+  const newest = products.slice(0, 8);
+  const promoImages = [
+    featured[0]?.image_url || products[0]?.image_url,
+    products[1]?.image_url || products[0]?.image_url,
+    products[2]?.image_url || products[0]?.image_url,
+  ];
+
+  const selectCategory = (id) => {
+    setCategoryId(id);
+    document.getElementById('catalog')?.scrollIntoView({ behavior: 'smooth' });
+  };
+
   return (
-    <div className="min-h-screen bg-white text-gray-900 store-front">
-      {/* Top trust bar */}
-      <div className="bg-white border-b border-gray-100 text-xs text-gray-600">
+    <div className="store-front min-h-screen bg-white text-gray-900">
+      {/* Top utility bar */}
+      <div className="bg-primary-800 text-primary-100 text-xs">
         <div className="max-w-7xl mx-auto px-4 py-2 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-4 md:gap-8">
-            {TRUST_BAR.map(({ icon: Icon, label }) => (
-              <span key={label} className="inline-flex items-center gap-1.5">
-                <Icon className="text-orange-500 text-[11px]" />
-                <span className="hidden sm:inline">{label}</span>
-              </span>
-            ))}
-          </div>
-          <span className="text-gray-400">KES · Kenya</span>
+          <span className="inline-flex items-center gap-1.5">
+            <FaHeadset className="text-primary-300" /> Need Help? 24/7 Support Center
+          </span>
+          <span className="inline-flex items-center gap-3">
+            <span className="hidden sm:inline">Special Offer · Season Sale up to 50% Off</span>
+            <Link to="/register" className="font-semibold text-white hover:underline">Sell on DukaMall</Link>
+          </span>
         </div>
       </div>
 
-      {/* Main nav */}
-      <header className="sticky top-0 z-40 bg-white border-b border-gray-100 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-4">
+      {/* Main header */}
+      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-gray-100 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-3">
+          <button
+            type="button"
+            className="lg:hidden p-2 text-gray-600"
+            onClick={() => setMobileNav(true)}
+            aria-label="Menu"
+          >
+            <FaBars />
+          </button>
+
           <Link to="/shop" className="flex items-center gap-2 shrink-0">
-            <span className="w-9 h-9 rounded-lg bg-orange-500 flex items-center justify-center text-white">
+            <span className="w-9 h-9 rounded-xl bg-primary-600 flex items-center justify-center text-white shadow-sm">
               <FaStore />
             </span>
             <span className="text-xl font-bold tracking-tight">
-              Duka<span className="text-orange-500">Mall</span>
+              Duka<span className="text-primary-600">Mall</span>
             </span>
           </Link>
 
-          <nav className="hidden lg:flex items-center gap-5 text-sm font-medium text-gray-700 ml-4">
-            <Link to="/shop" className="text-orange-500">Home</Link>
-            <button type="button" onClick={() => document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' })} className="hover:text-orange-500">Shop</button>
-            <button type="button" onClick={() => document.getElementById('categories')?.scrollIntoView({ behavior: 'smooth' })} className="hover:text-orange-500">Categories</button>
-            <Link to="/" className="hover:text-orange-500">Sell with us</Link>
+          <nav className="hidden lg:flex items-center gap-5 text-sm font-medium text-gray-600 ml-6">
+            <Link to="/shop" className="text-primary-600">Home</Link>
+            <button type="button" onClick={() => document.getElementById('categories')?.scrollIntoView({ behavior: 'smooth' })} className="hover:text-primary-600">Categories</button>
+            <button type="button" onClick={() => document.getElementById('deals')?.scrollIntoView({ behavior: 'smooth' })} className="hover:text-primary-600">Deals</button>
+            <button type="button" onClick={() => document.getElementById('catalog')?.scrollIntoView({ behavior: 'smooth' })} className="hover:text-primary-600">Best Sellers</button>
+            <Link to="/" className="hover:text-primary-600">Collections</Link>
           </nav>
 
           <form
-            className="flex-1 max-w-md ml-auto flex"
-            onSubmit={(e) => { e.preventDefault(); loadProducts(); }}
+            className="hidden md:flex flex-1 max-w-md ml-auto"
+            onSubmit={(e) => {
+              e.preventDefault();
+              loadProducts({ q });
+              document.getElementById('catalog')?.scrollIntoView({ behavior: 'smooth' });
+            }}
           >
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              className="w-full rounded-l-full border border-gray-200 border-r-0 px-4 py-2 text-sm focus:outline-none focus:border-orange-400"
-              placeholder="Search products..."
-            />
-            <button type="submit" className="bg-orange-500 hover:bg-orange-600 text-white px-4 rounded-r-full">
-              <FaSearch />
-            </button>
+            <div className="flex w-full rounded-full border border-gray-200 overflow-hidden focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-primary-100">
+              <input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                className="w-full px-4 py-2 text-sm outline-none bg-white"
+                placeholder="Search fashion, tech, beauty..."
+              />
+              <button type="submit" className="bg-primary-600 hover:bg-primary-700 text-white px-4">
+                <FaSearch />
+              </button>
+            </div>
           </form>
 
-          <div className="flex items-center gap-3 text-gray-600">
-            <Link to="/login" className="p-2 hover:text-orange-500" title="Account"><FaUser /></Link>
+          <div className="flex items-center gap-1 sm:gap-2 text-gray-600 ml-auto md:ml-2">
+            <button
+              type="button"
+              className="md:hidden p-2 hover:text-primary-600"
+              onClick={() => setSearchOpen((v) => !v)}
+              aria-label="Search"
+            >
+              <FaSearch />
+            </button>
+            <Link to="/login" className="p-2 hover:text-primary-600" title="Account"><FaUser /></Link>
             <span className="p-2 text-gray-300" title="Wishlist"><FaHeart /></span>
-            <Link to="/shop/checkout" className="relative p-2 hover:text-orange-500" title="Cart">
+            <Link to="/shop/checkout" className="relative p-2 hover:text-primary-600" title="Cart">
               <FaShoppingCart />
               {cartCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                <span className="absolute top-0 right-0 bg-primary-600 text-white text-[10px] font-bold min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center">
                   {cartCount > 9 ? '9+' : cartCount}
                 </span>
               )}
             </Link>
           </div>
         </div>
+        {searchOpen && (
+          <form
+            className="md:hidden px-4 pb-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              loadProducts({ q });
+              setSearchOpen(false);
+              document.getElementById('catalog')?.scrollIntoView({ behavior: 'smooth' });
+            }}
+          >
+            <div className="flex rounded-full border border-gray-200 overflow-hidden">
+              <input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                className="w-full px-4 py-2 text-sm outline-none"
+                placeholder="Search products..."
+                autoFocus
+              />
+              <button type="submit" className="bg-primary-600 text-white px-4"><FaSearch /></button>
+            </div>
+          </form>
+        )}
       </header>
 
-      {/* Hero — featured product (admin-paid placement) */}
-      <section className="bg-gradient-to-br from-gray-50 via-white to-orange-50/40 border-b border-gray-100">
-        <div className="max-w-7xl mx-auto px-4 py-10 md:py-16 grid md:grid-cols-2 gap-10 items-center">
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-          >
-            <p className="text-orange-500 text-xs font-bold tracking-[0.2em] uppercase mb-3">
-              {hero ? 'Featured Collection' : 'New Collection'}
-            </p>
-            <h1 className="text-3xl md:text-5xl font-bold leading-tight text-gray-900 mb-4">
-              {hero ? (
-                <>Discover <span className="text-gray-900">{hero.name}</span></>
+      {/* Mobile drawer */}
+      <AnimatePresence>
+        {mobileNav && (
+          <motion.div className="fixed inset-0 z-[60] lg:hidden" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <div className="absolute inset-0 bg-black/40" onClick={() => setMobileNav(false)} />
+            <motion.div
+              initial={{ x: -280 }}
+              animate={{ x: 0 }}
+              exit={{ x: -280 }}
+              className="absolute left-0 top-0 bottom-0 w-72 bg-white p-5 shadow-xl"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <span className="font-bold text-lg">Duka<span className="text-primary-600">Mall</span></span>
+                <button type="button" onClick={() => setMobileNav(false)}><FaTimes /></button>
+              </div>
+              <nav className="flex flex-col gap-3 text-sm font-medium text-gray-700">
+                <Link to="/shop" onClick={() => setMobileNav(false)}>Home</Link>
+                <button type="button" className="text-left" onClick={() => { setMobileNav(false); document.getElementById('categories')?.scrollIntoView({ behavior: 'smooth' }); }}>Categories</button>
+                <button type="button" className="text-left" onClick={() => { setMobileNav(false); document.getElementById('deals')?.scrollIntoView({ behavior: 'smooth' }); }}>Deals</button>
+                <Link to="/shop/checkout" onClick={() => setMobileNav(false)}>Cart ({cartCount})</Link>
+                <Link to="/login" onClick={() => setMobileNav(false)}>Account</Link>
+                <Link to="/register" onClick={() => setMobileNav(false)}>Sell with us</Link>
+              </nav>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Hero slider — paid featured products */}
+      <section className="relative bg-gray-900 overflow-hidden">
+        <div className="absolute inset-0">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeSlide.id || activeSlide.name || heroIndex}
+              initial={{ opacity: 0, scale: 1.04 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.6 }}
+              className="absolute inset-0"
+            >
+              {activeSlide.image_url ? (
+                <img
+                  src={activeSlide.image_url}
+                  alt={activeSlide.name}
+                  className="w-full h-full object-cover"
+                />
               ) : (
-                <>Discover The Best Products <span className="text-gray-700">Online</span></>
+                <div className="w-full h-full bg-gradient-to-br from-primary-900 via-primary-800 to-primary-600" />
               )}
-            </h1>
-            <p className="text-gray-500 text-base md:text-lg max-w-md mb-8">
-              {hero?.description
-                || 'Shop top-quality products at unbeatable prices. Exclusive deals just for you!'}
+              <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/50 to-black/20" />
+            </motion.div>
+          </AnimatePresence>
+        </div>
+
+        <div className="relative max-w-7xl mx-auto px-4 py-16 md:py-24 min-h-[420px] md:min-h-[520px] flex items-center">
+          <div className="max-w-xl text-white">
+            <p className="text-primary-300 text-xs font-bold tracking-[0.2em] uppercase mb-3">
+              {activeSlide.featured_badge || (activeSlide.id ? 'Featured' : 'New Collection')}
             </p>
-            <div className="flex flex-wrap gap-3">
-              {hero ? (
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold leading-tight mb-4">
+              {activeSlide.name || 'Find Your Style, Love Your Look'}
+            </h1>
+            <p className="text-white/80 text-base md:text-lg mb-6 line-clamp-3">
+              {activeSlide.description
+                || `Shop top picks from ${activeSlide.business_name || 'verified sellers'}.`}
+            </p>
+            <div className="flex flex-wrap gap-3 items-center">
+              {activeSlide.id ? (
                 <>
                   <Link
-                    to={`/shop/product/${hero.id}`}
-                    className="inline-flex items-center gap-2 bg-gray-900 hover:bg-black text-white px-6 py-3 rounded-md font-semibold text-sm transition"
+                    to={`/shop/product/${activeSlide.id}`}
+                    className="inline-flex items-center gap-2 bg-primary-600 hover:bg-primary-500 text-white px-6 py-3 rounded-full font-semibold text-sm transition"
                   >
                     Shop Now <FaChevronRight className="text-xs" />
                   </Link>
                   <button
                     type="button"
-                    onClick={() => handleAdd(hero)}
-                    className="inline-flex items-center gap-2 border border-gray-900 text-gray-900 hover:bg-gray-900 hover:text-white px-6 py-3 rounded-md font-semibold text-sm transition"
+                    onClick={() => handleAdd(activeSlide)}
+                    className="inline-flex items-center gap-2 border border-white/40 hover:bg-white/10 text-white px-6 py-3 rounded-full font-semibold text-sm transition"
                   >
                     Add to Cart
                   </button>
@@ -189,272 +403,244 @@ const MarketplacePage = () => {
               ) : (
                 <button
                   type="button"
-                  onClick={() => document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' })}
-                  className="inline-flex items-center gap-2 bg-gray-900 hover:bg-black text-white px-6 py-3 rounded-md font-semibold text-sm transition"
+                  onClick={() => document.getElementById('catalog')?.scrollIntoView({ behavior: 'smooth' })}
+                  className="inline-flex items-center gap-2 bg-primary-600 hover:bg-primary-500 text-white px-6 py-3 rounded-full font-semibold text-sm"
                 >
                   Shop Now <FaChevronRight className="text-xs" />
                 </button>
               )}
             </div>
-            {hero && (
-              <p className="mt-4 text-sm text-gray-400">
-                Sold by {hero.business_name} · {formatCurrency(hero.selling_price)}
+            {activeSlide.business_name && (
+              <p className="mt-5 text-sm text-white/60">
+                Featured by <span className="text-white font-medium">{activeSlide.business_name}</span>
+                {activeSlide.selling_price != null && (
+                  <> · {formatCurrency(activeSlide.selling_price)}</>
+                )}
               </p>
             )}
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, scale: 0.96 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.55, delay: 0.1 }}
-            className="relative flex justify-center"
-          >
-            <div className="relative w-full max-w-md aspect-square bg-gradient-to-b from-gray-100 to-gray-50 rounded-2xl flex items-center justify-center overflow-hidden">
-              {hero?.image_url ? (
-                <img src={hero.image_url} alt={hero.name} className="w-full h-full object-contain p-6" />
-              ) : (
-                <FaStore className="text-7xl text-gray-300" />
-              )}
-              {(hero?.featured_badge || hero) && (
-                <span className="absolute top-6 right-6 w-16 h-16 rounded-full bg-orange-500 text-white text-xs font-bold flex items-center justify-center text-center leading-tight shadow-lg">
-                  {hero?.featured_badge || 'New'}
-                </span>
-              )}
-            </div>
-          </motion.div>
+          </div>
         </div>
 
-        <div className="max-w-7xl mx-auto px-4 pb-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {HERO_TRUST.map(({ icon: Icon, title, sub }) => (
-            <div key={title} className="flex items-center gap-3 py-2">
-              <span className="w-10 h-10 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center">
+        {heroSlides.length > 1 && (
+          <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-2 z-10">
+            {heroSlides.map((s, i) => (
+              <button
+                key={s.id || i}
+                type="button"
+                onClick={() => setHeroIndex(i)}
+                className={`h-1.5 rounded-full transition-all ${
+                  i === heroIndex % heroSlides.length ? 'w-8 bg-primary-400' : 'w-1.5 bg-white/40'
+                }`}
+                aria-label={`Slide ${i + 1}`}
+              />
+            ))}
+          </div>
+        )}
+        {heroSlides.length > 1 && (
+          <>
+            <button
+              type="button"
+              onClick={() => setHeroIndex((i) => (i - 1 + heroSlides.length) % heroSlides.length)}
+              className="absolute left-3 md:left-6 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/15 hover:bg-white/25 text-white flex items-center justify-center backdrop-blur z-10"
+              aria-label="Previous"
+            >
+              <FaChevronLeft />
+            </button>
+            <button
+              type="button"
+              onClick={() => setHeroIndex((i) => (i + 1) % heroSlides.length)}
+              className="absolute right-3 md:right-6 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/15 hover:bg-white/25 text-white flex items-center justify-center backdrop-blur z-10"
+              aria-label="Next"
+            >
+              <FaChevronRight />
+            </button>
+          </>
+        )}
+      </section>
+
+      {/* Category chips — horizontal scroll */}
+      <section id="categories" className="border-b border-gray-100 bg-white">
+        <div className="max-w-7xl mx-auto px-4 py-5">
+          <div ref={catScroll.ref} className="scroll-rail gap-2">
+            <button
+              type="button"
+              onClick={() => selectCategory('')}
+              className={`shrink-0 px-4 py-2 rounded-full text-sm font-medium border transition ${
+                !categoryId
+                  ? 'bg-primary-600 text-white border-primary-600'
+                  : 'bg-white text-gray-700 border-gray-200 hover:border-primary-400'
+              }`}
+            >
+              All
+            </button>
+            {categories.map((cat, idx) => {
+              const Icon = CAT_ICONS[idx % CAT_ICONS.length];
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => selectCategory(cat.id)}
+                  className={`shrink-0 inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition ${
+                    categoryId === cat.id
+                      ? 'bg-primary-600 text-white border-primary-600'
+                      : 'bg-white text-gray-700 border-gray-200 hover:border-primary-400'
+                  }`}
+                >
+                  <Icon className="text-xs opacity-80" />
+                  {cat.name}
+                  <span className="opacity-70 text-xs">({cat.product_count ?? 0})</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* Promo tiles */}
+      <section id="deals" className="max-w-7xl mx-auto px-4 py-8 grid sm:grid-cols-3 gap-4">
+        {[
+          {
+            title: 'Flash Sale',
+            sub: 'Limited time deals on DukaMall',
+            cta: 'Shop deals',
+            bg: 'from-primary-700 to-primary-500',
+            img: promoImages[0],
+          },
+          {
+            title: 'Free Shipping',
+            sub: 'On orders over KES 2,000',
+            cta: 'Shop now',
+            bg: 'from-emerald-800 to-teal-600',
+            img: promoImages[1],
+          },
+          {
+            title: 'New Arrivals',
+            sub: 'Latest from verified sellers',
+            cta: 'Explore',
+            bg: 'from-gray-800 to-gray-600',
+            img: promoImages[2],
+          },
+        ].map((tile) => (
+          <button
+            key={tile.title}
+            type="button"
+            onClick={() => document.getElementById('catalog')?.scrollIntoView({ behavior: 'smooth' })}
+            className={`relative overflow-hidden rounded-2xl min-h-[140px] text-left p-5 text-white bg-gradient-to-br ${tile.bg}`}
+          >
+            {tile.img && (
+              <img src={tile.img} alt="" className="absolute right-0 bottom-0 w-28 h-28 object-cover opacity-40 rounded-tl-3xl" />
+            )}
+            <p className="relative text-lg font-bold">{tile.title}</p>
+            <p className="relative text-sm text-white/80 mt-1 mb-3">{tile.sub}</p>
+            <span className="relative text-xs font-semibold underline underline-offset-2">{tile.cta}</span>
+          </button>
+        ))}
+      </section>
+
+      {loading && !products.length ? (
+        <div className="text-center py-20 text-gray-400">Loading products...</div>
+      ) : (
+        <>
+          <div id="catalog">
+            <ScrollRail
+              title="Best Deals for You"
+              products={deals}
+              onAdd={handleAdd}
+              onViewAll={() => selectCategory('')}
+            />
+          </div>
+          <div className="bg-primary-50/40">
+            <ScrollRail
+              title="Recommended for You"
+              products={recommended}
+              onAdd={handleAdd}
+            />
+          </div>
+          <ScrollRail
+            title="New Arrivals"
+            products={newest}
+            onAdd={handleAdd}
+          />
+        </>
+      )}
+
+      {!loading && products.length === 0 && (
+        <div className="max-w-7xl mx-auto px-4 py-16 text-center text-gray-400">
+          No products match your filters
+        </div>
+      )}
+
+      {/* Trust row */}
+      <section className="border-y border-gray-100 bg-white">
+        <div className="max-w-7xl mx-auto px-4 py-8 grid grid-cols-2 md:grid-cols-4 gap-6">
+          {[
+            { icon: FaLock, title: 'Secure Payment', sub: 'M-Pesa & checkout safety' },
+            { icon: FaUndo, title: 'Easy Returns', sub: '30-day return policy' },
+            { icon: FaHeadset, title: '24/7 Support', sub: 'Dedicated help center' },
+            { icon: FaStar, title: 'Trusted Sellers', sub: 'Approved businesses only' },
+          ].map(({ icon: Icon, title, sub }) => (
+            <div key={title} className="flex items-start gap-3">
+              <span className="w-10 h-10 rounded-full bg-primary-50 text-primary-600 flex items-center justify-center shrink-0">
                 <Icon />
               </span>
               <div>
                 <p className="font-semibold text-sm text-gray-900">{title}</p>
-                <p className="text-xs text-gray-500">{sub}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{sub}</p>
               </div>
             </div>
           ))}
         </div>
       </section>
 
-      {/* Categories with product counts */}
-      <section id="categories" className="max-w-7xl mx-auto px-4 py-12">
-        <div className="flex items-center justify-between mb-8">
-          <h2 className="text-2xl font-bold text-gray-900">Shop By Category</h2>
-          <button
-            type="button"
-            onClick={() => setCategoryId('')}
-            className="text-sm text-orange-500 font-medium hover:underline inline-flex items-center gap-1"
-          >
-            View All <FaChevronRight className="text-[10px]" />
-          </button>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
-          <button
-            type="button"
-            onClick={() => setCategoryId('')}
-            className={`rounded-xl border p-4 text-center transition hover:border-orange-400 hover:shadow-md ${
-              !categoryId ? 'border-orange-500 bg-orange-50' : 'border-gray-100 bg-white'
-            }`}
-          >
-            <span className="w-14 h-14 mx-auto rounded-full bg-gray-100 flex items-center justify-center text-orange-500 mb-3">
-              <FaBoxOpen className="text-xl" />
-            </span>
-            <p className="font-semibold text-sm">All</p>
-            <p className="text-xs text-gray-400 mt-0.5">{products.length} items</p>
-          </button>
-          {categories.map((cat) => (
-            <button
-              key={cat.id}
-              type="button"
-              onClick={() => setCategoryId(cat.id)}
-              className={`rounded-xl border p-4 text-center transition hover:border-orange-400 hover:shadow-md ${
-                categoryId === cat.id ? 'border-orange-500 bg-orange-50' : 'border-gray-100 bg-white'
-              }`}
-            >
-              <span
-                className="w-14 h-14 mx-auto rounded-full flex items-center justify-center mb-3"
-                style={{ backgroundColor: `${cat.color || '#f97316'}22`, color: cat.color || '#f97316' }}
-              >
-                <FaStore className="text-xl" />
-              </span>
-              <p className="font-semibold text-sm truncate">{cat.name}</p>
-              <p className="text-xs text-gray-400 mt-0.5">{cat.product_count ?? 0} products</p>
-            </button>
-          ))}
-        </div>
-      </section>
-
-      {/* Products grid */}
-      <section id="products" className="bg-gray-50/80 border-y border-gray-100">
-        <div className="max-w-7xl mx-auto px-4 py-12">
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-8">
-            <h2 className="text-2xl font-bold text-gray-900">Best Selling Products</h2>
-            <div className="flex items-center gap-3">
-              <select
-                value={sort}
-                onChange={(e) => setSort(e.target.value)}
-                className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm"
-              >
-                <option value="newest">Newest</option>
-                <option value="price_asc">Price: Low to High</option>
-                <option value="price_desc">Price: High to Low</option>
-                <option value="name">Name A–Z</option>
-              </select>
-            </div>
-          </div>
-
-          {loading ? (
-            <div className="text-center py-20 text-gray-400">Loading products...</div>
-          ) : products.length === 0 ? (
-            <div className="text-center py-20 text-gray-400 bg-white rounded-xl border border-gray-100">
-              No products match your filters
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-5">
-              {products.map((product) => (
-                <article
-                  key={product.id}
-                  className="bg-white rounded-xl border border-gray-100 overflow-hidden group hover:shadow-lg transition-shadow"
-                >
-                  <div className="relative aspect-square bg-gray-50">
-                    <Link to={`/shop/product/${product.id}`}>
-                      {product.image_url ? (
-                        <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-gray-300">
-                          <FaStore className="text-4xl" />
-                        </div>
-                      )}
-                    </Link>
-                    {product.is_featured && (
-                      <span className="absolute top-2 left-2 bg-orange-500 text-white text-[10px] font-bold px-2 py-0.5 rounded">
-                        Featured
-                      </span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => handleAdd(product)}
-                      className="absolute bottom-2 right-2 w-9 h-9 rounded-full bg-white shadow flex items-center justify-center text-gray-700 opacity-0 group-hover:opacity-100 transition hover:bg-orange-500 hover:text-white"
-                      title="Add to cart"
-                    >
-                      <FaShoppingCart className="text-sm" />
-                    </button>
-                  </div>
-                  <div className="p-4">
-                    <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-1">
-                      {product.category_name || product.business_name}
-                    </p>
-                    <Link to={`/shop/product/${product.id}`}>
-                      <h3 className="font-semibold text-gray-900 text-sm line-clamp-1 hover:text-orange-500">
-                        {product.name}
-                      </h3>
-                    </Link>
-                    <p className="text-sm font-bold text-gray-900 mt-2">{formatCurrency(product.selling_price)}</p>
-                    <button
-                      type="button"
-                      onClick={() => handleAdd(product)}
-                      className="mt-3 w-full bg-gray-900 hover:bg-orange-500 text-white text-xs font-semibold py-2.5 rounded-md transition"
-                    >
-                      Add to Cart
-                    </button>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* Promo banner */}
-      <section className="bg-gray-900 text-white">
-        <div className="max-w-7xl mx-auto px-4 py-8 flex flex-col md:flex-row items-center justify-between gap-6">
+      {/* Club / CTA */}
+      <section className="bg-gradient-to-r from-primary-800 to-primary-600 text-white">
+        <div className="max-w-7xl mx-auto px-4 py-12 flex flex-col md:flex-row items-center justify-between gap-6">
           <div>
-            <p className="text-orange-400 text-xs font-bold uppercase tracking-wider mb-1">Limited Time Offer</p>
-            <h3 className="text-xl md:text-2xl font-bold">Super Sale — Shop verified stores on DukaMall</h3>
-            <p className="text-gray-400 text-sm mt-1">Secure M-Pesa checkout · Quality products from approved sellers</p>
+            <h2 className="text-2xl font-bold">Join DukaMall Club</h2>
+            <p className="text-primary-100 mt-1 text-sm">Exclusive offers, early access, and seller updates.</p>
           </div>
-          <button
-            type="button"
-            onClick={() => document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' })}
-            className="shrink-0 bg-orange-500 hover:bg-orange-600 text-white font-semibold px-6 py-3 rounded-md text-sm"
+          <Link
+            to="/register"
+            className="shrink-0 bg-white text-primary-700 font-semibold px-6 py-3 rounded-full text-sm hover:bg-primary-50 transition"
           >
-            Shop The Sale
-          </button>
-        </div>
-      </section>
-
-      {/* Why us stats */}
-      <section className="max-w-7xl mx-auto px-4 py-12">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
-          {[
-            { n: '10K+', l: 'Happy Customers' },
-            { n: '15K+', l: 'Products Sold' },
-            { n: '99%', l: 'Positive Reviews' },
-            { n: '24/7', l: 'Customer Support' },
-          ].map((s) => (
-            <div key={s.l}>
-              <p className="text-2xl font-bold text-gray-900">{s.n}</p>
-              <p className="text-sm text-gray-500 mt-1">{s.l}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Bottom trust */}
-      <section className="border-t border-gray-100 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 py-8 grid grid-cols-2 md:grid-cols-4 gap-4">
-          {FOOTER_TRUST.map(({ icon: Icon, title }) => (
-            <div key={title} className="flex items-center gap-3 justify-center py-2">
-              <Icon className="text-orange-500" />
-              <span className="text-sm font-medium text-gray-700">{title}</span>
-            </div>
-          ))}
+            Join Now
+          </Link>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="bg-gray-900 text-gray-400">
+      <footer className="bg-gray-950 text-gray-400">
         <div className="max-w-7xl mx-auto px-4 py-12 grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
           <div>
             <div className="flex items-center gap-2 text-white mb-3">
-              <FaStore className="text-orange-500" />
-              <span className="font-bold text-lg">Duka<span className="text-orange-500">Mall</span></span>
+              <FaStore className="text-primary-400" />
+              <span className="font-bold text-lg">Duka<span className="text-primary-400">Mall</span></span>
             </div>
             <p className="text-sm leading-relaxed">
-              Multi-vendor marketplace powered by Duka Yetu. Pay safely with M-Pesa.
+              Multi-vendor marketplace powered by Duka Yetu. Secure M-Pesa payments from verified shops.
             </p>
           </div>
           <div>
-            <h4 className="text-white font-semibold mb-3 text-sm">Quick Links</h4>
+            <h4 className="text-white font-semibold mb-3 text-sm">Shop</h4>
             <ul className="space-y-2 text-sm">
-              <li><Link to="/shop" className="hover:text-white">Shop</Link></li>
-              <li><Link to="/register" className="hover:text-white">Sell on DukaMall</Link></li>
-              <li><Link to="/login" className="hover:text-white">Sign in</Link></li>
+              <li><Link to="/shop" className="hover:text-white">All products</Link></li>
+              <li><Link to="/shop/checkout" className="hover:text-white">Cart</Link></li>
+              <li><Link to="/login" className="hover:text-white">My account</Link></li>
             </ul>
           </div>
           <div>
-            <h4 className="text-white font-semibold mb-3 text-sm">Customer Service</h4>
+            <h4 className="text-white font-semibold mb-3 text-sm">Sell</h4>
             <ul className="space-y-2 text-sm">
-              <li className="inline-flex items-center gap-2"><FaHeadset className="text-orange-500" /> 24/7 Support</li>
-              <li className="inline-flex items-center gap-2"><FaTruck className="text-orange-500" /> Shipping Policy</li>
-              <li className="inline-flex items-center gap-2"><FaUndo className="text-orange-500" /> Returns</li>
+              <li><Link to="/register" className="hover:text-white">Open a shop</Link></li>
+              <li><Link to="/" className="hover:text-white">About Duka Yetu</Link></li>
             </ul>
           </div>
           <div>
             <h4 className="text-white font-semibold mb-3 text-sm">Payments</h4>
-            <div className="flex flex-wrap gap-2 items-center">
-              <span className="inline-flex items-center gap-1.5 bg-white/10 text-white text-xs px-2.5 py-1.5 rounded">
-                <FaCreditCard /> M-Pesa
-              </span>
-              <span className="inline-flex items-center gap-1.5 bg-white/10 text-white text-xs px-2.5 py-1.5 rounded">
-                Visa
-              </span>
-              <span className="inline-flex items-center gap-1.5 bg-white/10 text-white text-xs px-2.5 py-1.5 rounded">
-                Mastercard
-              </span>
+            <div className="flex flex-wrap gap-2">
+              <span className="bg-white/10 text-white text-xs px-2.5 py-1.5 rounded">M-Pesa</span>
+              <span className="bg-white/10 text-white text-xs px-2.5 py-1.5 rounded">Visa</span>
+              <span className="bg-white/10 text-white text-xs px-2.5 py-1.5 rounded">Mastercard</span>
             </div>
           </div>
         </div>

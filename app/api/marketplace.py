@@ -167,9 +167,9 @@ def list_marketplace_products(
 @router.get("/featured", response_model=List[MarketProduct])
 def list_featured_products(
     db: Session = Depends(get_db),
-    limit: int = Query(6, ge=1, le=20),
+    limit: int = Query(12, ge=1, le=20),
 ):
-    """Products paid to appear on the store hero."""
+    """Products paid to appear on the store hero (or placed by super admin)."""
     now = datetime.utcnow()
     rows = (
         db.query(Product, Business)
