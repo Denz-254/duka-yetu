@@ -8,12 +8,13 @@ from datetime import datetime
 
 from app.core.config import settings
 from app.core.database import init_db, engine, SessionLocal
-from app.api import auth, products, sales, dashboard, upload, subscription, resources, payments, admin, marketplace, orders, reports
+from app.api import auth, products, sales, dashboard, upload, subscription, resources, payments, admin, marketplace, orders, reports, shifts
 from app.core.bootstrap import ensure_schema_patches, ensure_super_admin
 from app.core.dependencies import require_feature
 from app.domains.users.routes import router as users_router
 from app.models.mpesa_transaction import MpesaTransaction  # noqa: F401 — register model
 from app.models.online_order import Notification, OnlineOrder  # noqa: F401 — register model
+from app.models.cashier_shift import CashierShift  # noqa: F401 — register model
 
 # Use lifespan instead of on_event (modern FastAPI)
 @asynccontextmanager
@@ -132,6 +133,12 @@ app.include_router(
     orders.router,
     prefix="/api/v1/orders",
     tags=["Online Orders"],
+    dependencies=[Depends(require_feature("pos"))],
+)
+app.include_router(
+    shifts.router,
+    prefix="/api/v1/shifts",
+    tags=["Cashier Shifts"],
     dependencies=[Depends(require_feature("pos"))],
 )
 

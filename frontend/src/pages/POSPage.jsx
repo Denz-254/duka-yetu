@@ -10,9 +10,10 @@ import { toast } from 'react-hot-toast';
 import useCartStore from '../store/cartStore';
 import useAuthStore from '../store/authStore';
 import api from '../api/client';
-import { payments } from '../api/endpoints';
+import { payments, shifts } from '../api/endpoints';
 import { formatCurrency } from '../utils/helpers';
 import ProductCard from '../components/products/ProductCard';
+import ShiftClock from '../components/shifts/ShiftClock';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -26,26 +27,22 @@ const POSPage = () => {
   const [mpesaPhone, setMpesaPhone] = useState('');
   const [mpesaStatus, setMpesaStatus] = useState('');
   const [mpesaMode, setMpesaMode] = useState({ account_type: 'paybill', send_money_phone: '', stk_available: true });
+  const [shift, setShift] = useState(undefined);
+  const [shiftRefresh, setShiftRefresh] = useState(0);
   const { items, total, addItem, removeItem, updateQuantity, clearCart } = useCartStore();
   const user = useAuthStore((state) => state.user);
 
-  if (user && user.role !== 'CASHIER') {
-    return (
-      <div className="bg-white rounded-xl border border-amber-100 p-8 text-center">
-        <h1 className="text-xl font-bold text-gray-800">Cashiers only</h1>
-        <p className="text-gray-500 mt-2">
-          Owners manage products and settings. Only cashier accounts can make sales on the POS.
-        </p>
-      </div>
-    );
-  }
-
   useEffect(() => {
+    if (user && user.role !== 'CASHIER') return undefined;
     fetchProducts();
+    shifts.current()
+      .then(({ data }) => setShift(data || null))
+      .catch(() => setShift(null));
     payments.mpesaMode()
       .then(({ data }) => setMpesaMode(data || {}))
       .catch(() => {});
-  }, []);
+    return undefined;
+  }, [user?.role]);
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -123,6 +120,7 @@ const POSPage = () => {
         setMpesaStatus('');
         toast.success('M-Pesa payment successful!');
         fetchProducts();
+        setShiftRefresh((n) => n + 1);
         return;
       }
 
@@ -135,6 +133,7 @@ const POSPage = () => {
       clearCart();
       toast.success('Sale completed successfully!');
       fetchProducts();
+      setShiftRefresh((n) => n + 1);
     } catch (error) {
       const message = error.response?.data?.detail || error.message || 'Sale failed';
       toast.error(typeof message === 'string' ? message : 'Sale failed');
@@ -152,8 +151,34 @@ const POSPage = () => {
     { value: 'CARD', icon: FaCreditCard, label: 'Card' },
   ];
 
+  if (user && user.role !== 'CASHIER') {
+    return (
+      <div className="bg-white rounded-xl border border-amber-100 p-8 text-center">
+        <h1 className="text-xl font-bold text-gray-800">Cashiers only</h1>
+        <p className="text-gray-500 mt-2">
+          Owners manage products and settings. Only cashier accounts can make sales on the POS.
+        </p>
+      </div>
+    );
+  }
+
+  if (shift === undefined) {
+    return <div className="text-gray-400 py-12 text-center">Checking your shift...</div>;
+  }
+
+  if (!shift) {
+    return (
+      <div className="max-w-lg mx-auto">
+        <h1 className="text-2xl font-bold text-gray-800 mb-2">Start your shift</h1>
+        <p className="text-sm text-gray-500 mb-4">Clock in with the cash in the drawer before you sell.</p>
+        <ShiftClock onChange={setShift} />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
+      <ShiftClock compact onChange={setShift} refreshToken={shiftRefresh} />
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

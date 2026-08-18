@@ -24,7 +24,8 @@ import {
   FaCrown,
   FaTags,
   FaTruck,
-  FaBarcode
+  FaBarcode,
+  FaClock
 } from 'react-icons/fa';
 import useAuthStore from '../../store/authStore';
 import useSubscriptionStore from '../../store/subscriptionStore';
@@ -43,6 +44,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
   const navItems = [
     { path: '/dashboard', icon: FaHome, label: 'Dashboard', feature: 'basic_reports' },
     { path: '/pos', icon: FaShoppingCart, label: 'POS', feature: 'pos', cashierOnly: true },
+    { path: '/shifts', icon: FaClock, label: 'Shifts', feature: 'pos' },
     { path: '/orders', icon: FaClipboardList, label: 'Online Orders', feature: 'pos' },
   ];
 

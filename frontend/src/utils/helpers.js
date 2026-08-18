@@ -22,6 +22,22 @@ export const formatDate = (date) => {
   });
 };
 
+export const formatTime = (date) => {
+  if (!date) return '—';
+  return new Date(date).toLocaleTimeString('en-KE', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
+
+export const formatDuration = (minutes) => {
+  if (minutes == null) return '—';
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  if (hours <= 0) return `${mins} min`;
+  return `${hours}h ${mins}m`;
+};
+
 export const truncateText = (text, length = 30) => {
   if (!text) return '';
   return text.length > length ? text.substring(0, length) + '...' : text;

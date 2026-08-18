@@ -97,3 +97,10 @@ export const subscription = {
     responseType: 'blob',
   }),
 };
+
+export const shifts = {
+  current: () => api.get('/shifts/current'),
+  open: (opening_cash) => api.post('/shifts/open', { opening_cash }),
+  close: (data) => api.post('/shifts/close', data),
+  list: (params) => api.get('/shifts/', { params }),
+};

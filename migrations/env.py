@@ -9,7 +9,7 @@ from alembic import context
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from app.core.database import Base
-from app.models import Business, User, Product, Sale, SaleItem
+from app.models import Business, User, Product, Sale, SaleItem, CashierShift
 from app.core.config import settings
 
 # this is the Alembic Config object

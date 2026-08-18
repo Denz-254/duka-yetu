@@ -8,6 +8,7 @@ from app.models.sale_item import SaleItem
 from app.models.resources import Branch, Category, Customer, Supplier
 from app.models.mpesa_transaction import MpesaTransaction
 from app.models.online_order import Notification, OnlineOrder
+from app.models.cashier_shift import CashierShift
 
 __all__ = [
     "Business",
@@ -22,4 +23,5 @@ __all__ = [
     "MpesaTransaction",
     "OnlineOrder",
     "Notification",
+    "CashierShift",
 ]

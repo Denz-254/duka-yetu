@@ -30,6 +30,7 @@ import MarketplacePage from './pages/MarketplacePage';
 import MarketplaceProductPage from './pages/MarketplaceProductPage';
 import MarketplaceCheckoutPage from './pages/MarketplaceCheckoutPage';
 import OrdersPage from './pages/OrdersPage';
+import ShiftsPage from './pages/ShiftsPage';
 import Layout from './components/common/Layout';
 import './App.css';
 
@@ -113,6 +114,7 @@ function App() {
           {/* Main Pages */}
           <Route path="dashboard" element={<FeatureRoute feature="basic_reports"><DashboardPage /></FeatureRoute>} />
           <Route path="pos" element={<FeatureRoute feature="pos"><POSPage /></FeatureRoute>} />
+          <Route path="shifts" element={<FeatureRoute feature="pos"><ShiftsPage /></FeatureRoute>} />
           <Route path="products" element={<FeatureRoute feature="products"><ProductsPage /></FeatureRoute>} />
           <Route path="orders" element={<FeatureRoute feature="pos"><OrdersPage /></FeatureRoute>} />
           <Route path="staff" element={<FeatureRoute feature="business_settings"><StaffPage /></FeatureRoute>} />

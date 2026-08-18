@@ -8,10 +8,12 @@ import {
   FaHourglassHalf, FaBuilding, FaPhone, FaEnvelope, FaCalendarAlt,
   FaUserFriends, FaReceipt
 } from 'react-icons/fa';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import useAuthStore from '../store/authStore';
 import api from '../api/client';
-import { formatCurrency, formatDate } from '../utils/helpers';
+import { formatCurrency, formatDate, formatDuration } from '../utils/helpers';
+import ShiftClock from '../components/shifts/ShiftClock';
+import { shifts } from '../api/endpoints';
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart
@@ -33,6 +35,7 @@ const DashboardPage = () => {
   const [topProducts, setTopProducts] = useState([]);
   const [weeklySalesData, setWeeklySalesData] = useState([]);
   const [dailyOrdersData, setDailyOrdersData] = useState([]);
+  const [shiftRows, setShiftRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -49,13 +52,15 @@ const DashboardPage = () => {
     try {
       if (isOwner) {
         // Owner dashboard - fetch all data
-        const [overviewRes, weeklyRes, lowStockRes, productsRes, salesRes] = await Promise.all([
+        const [overviewRes, weeklyRes, lowStockRes, productsRes, salesRes, shiftsRes] = await Promise.all([
           api.get('/dashboard/owner/overview'),
           api.get('/dashboard/owner/weekly-sales'),
           api.get('/dashboard/owner/low-stock'),
           api.get('/products/'),
-          api.get('/sales/')
+          api.get('/sales/'),
+          shifts.list({ limit: 8 }).catch(() => ({ data: [] })),
         ]);
+        setShiftRows(shiftsRes.data || []);
 
         if (overviewRes.data) {
           setStats({
@@ -259,6 +264,67 @@ const DashboardPage = () => {
           <span>May 6 - May 12, 2025</span>
         </div>
       </div>
+
+      {!isOwner && <ShiftClock />}
+
+      {isOwner && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                <FaClock className="text-primary-600" /> Cashier shifts
+              </h3>
+              <p className="text-xs text-gray-400 mt-1">Who clocked in, opening cash, clock-out, and money made</p>
+            </div>
+            <Link to="/shifts" className="text-sm text-primary-600 hover:text-primary-700 font-medium">
+              View all
+            </Link>
+          </div>
+          {shiftRows.length === 0 ? (
+            <p className="text-center text-gray-400 py-6">No shifts yet. Cashiers clock in from POS before selling.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="text-left text-xs uppercase text-gray-400 border-b border-gray-50">
+                    <th className="pb-2 pr-3">Cashier</th>
+                    <th className="pb-2 pr-3">In</th>
+                    <th className="pb-2 pr-3">Opening</th>
+                    <th className="pb-2 pr-3">Out</th>
+                    <th className="pb-2 pr-3">Closing</th>
+                    <th className="pb-2 pr-3">Made</th>
+                    <th className="pb-2">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {shiftRows.map((row) => (
+                    <tr key={row.id} className="border-b border-gray-50 last:border-0">
+                      <td className="py-2 pr-3">
+                        <p className="text-sm font-medium text-gray-800">{row.cashier_name}</p>
+                        <p className="text-xs text-gray-400">{formatDuration(row.duration_minutes)}</p>
+                      </td>
+                      <td className="py-2 pr-3 text-sm text-gray-600">{formatDate(row.opened_at)}</td>
+                      <td className="py-2 pr-3 text-sm font-semibold text-gray-800">{formatCurrency(row.opening_cash)}</td>
+                      <td className="py-2 pr-3 text-sm text-gray-600">{row.closed_at ? formatDate(row.closed_at) : 'Open'}</td>
+                      <td className="py-2 pr-3 text-sm font-semibold text-gray-800">
+                        {row.closing_cash != null ? formatCurrency(row.closing_cash) : '—'}
+                      </td>
+                      <td className="py-2 pr-3 text-sm font-bold text-primary-700">{formatCurrency(row.total_sales)}</td>
+                      <td className="py-2">
+                        <span className={`text-xs px-2 py-1 rounded-full ${
+                          row.status === 'OPEN' ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-600'
+                        }`}>
+                          {row.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
