@@ -413,3 +413,33 @@ def download_order_invoice(order_id: UUID, db: Session = Depends(get_db)):
             "Content-Disposition": f'attachment; filename="invoice-{order.order_number}.html"'
         },
     )
+
+
+@router.get("/deal-of-the-day", response_model=Optional[MarketProduct])
+def get_deal_of_the_day(db: Session = Depends(get_db)):
+    """Get the current deal of the day product if set by admin."""
+    product = db.query(Product).filter(
+        Product.is_deal_of_day == True,
+        or_(Product.deal_of_day_until == None, Product.deal_of_day_until > datetime.utcnow())
+    ).first()
+    
+    if not product:
+        return None
+    
+    business = db.query(Business).filter(Business.id == product.business_id).first()
+    category = db.query(Category).filter(Category.id == product.category_id).first() if product.category_id else None
+    
+    return MarketProduct(
+        id=str(product.id),
+        name=product.name,
+        description=product.description,
+        sku=product.sku,
+        selling_price=Decimal(str(product.selling_price)),
+        stock_quantity=product.stock_quantity,
+        image_url=product.image_url,
+        business_id=str(business.id) if business else None,
+        business_name=business.name if business else None,
+        category_id=str(product.category_id) if product.category_id else None,
+        category_name=category.name if category else None,
+        is_featured=product.is_featured,
+    )

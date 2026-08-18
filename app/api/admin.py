@@ -515,3 +515,103 @@ def admin_unfeature_product(
     db.commit()
     return None
 
+
+@router.get("/deal-of-the-day", response_model=Optional[AdminProductItem])
+def admin_get_deal_of_day(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_super_admin),
+):
+    """Get the current deal of the day product."""
+    product = db.query(Product).filter(
+        Product.is_deal_of_day == True,
+        or_(Product.deal_of_day_until == None, Product.deal_of_day_until > datetime.utcnow())
+    ).first()
+    
+    if not product:
+        return None
+    
+    business = db.query(Business).filter(Business.id == product.business_id).first()
+    if not business:
+        return None
+    
+    return AdminProductItem(
+        id=str(product.id),
+        name=product.name,
+        sku=product.sku,
+        selling_price=float(product.selling_price),
+        stock_quantity=product.stock_quantity,
+        image_url=product.image_url,
+        business_id=str(business.id),
+        business_name=business.name,
+        is_featured=product.is_featured,
+        featured_until=product.featured_until,
+        featured_badge=product.featured_badge,
+        days_remaining=_days_remaining(product.featured_until) if product.featured_until else None,
+        is_active=bool(product.is_active),
+    )
+
+
+@router.post("/deal-of-the-day/{product_id}", response_model=AdminProductItem)
+def admin_set_deal_of_day(
+    product_id: UUID,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_super_admin),
+):
+    """Set a product as the deal of the day (clears any previous deal)."""
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    
+    business = db.query(Business).filter(Business.id == product.business_id).first()
+    if not business or business.approval_status != "APPROVED":
+        raise HTTPException(status_code=400, detail="Business must be approved")
+    
+    # Clear any previous deal of the day
+    db.query(Product).filter(Product.is_deal_of_day == True).update(
+        {
+            Product.is_deal_of_day: False,
+            Product.deal_of_day_until: None,
+        }
+    )
+    
+    # Set new deal of the day (expires at end of today)
+    now = datetime.utcnow()
+    deal_expires = now.replace(hour=23, minute=59, second=59) + timedelta(days=1)
+    
+    product.is_deal_of_day = True
+    product.deal_of_day_until = deal_expires
+    db.commit()
+    db.refresh(product)
+    
+    return AdminProductItem(
+        id=str(product.id),
+        name=product.name,
+        sku=product.sku,
+        selling_price=float(product.selling_price),
+        stock_quantity=product.stock_quantity,
+        image_url=product.image_url,
+        business_id=str(business.id),
+        business_name=business.name,
+        is_featured=product.is_featured,
+        featured_until=product.featured_until,
+        featured_badge=product.featured_badge,
+        days_remaining=_days_remaining(product.featured_until) if product.featured_until else None,
+        is_active=bool(product.is_active),
+    )
+
+
+@router.delete("/deal-of-the-day", status_code=204)
+def admin_clear_deal_of_day(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_super_admin),
+):
+    """Clear the current deal of the day."""
+    db.query(Product).filter(Product.is_deal_of_day == True).update(
+        {
+            Product.is_deal_of_day: False,
+            Product.deal_of_day_until: None,
+        }
+    )
+    db.commit()
+    return None
+

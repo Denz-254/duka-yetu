@@ -22,11 +22,14 @@ const SuperAdminDashboard = () => {
   const [filter, setFilter] = useState('PENDING');
   const [loading, setLoading] = useState(true);
   const [featured, setFeatured] = useState([]);
+  const [dealOfTheDay, setDealOfTheDay] = useState(null);
   const [productQuery, setProductQuery] = useState('');
   const [productResults, setProductResults] = useState([]);
   const [featureDays, setFeatureDays] = useState(30);
   const [badgeText, setBadgeText] = useState('Featured');
   const [featLoading, setFeatLoading] = useState(false);
+  const [dealQuery, setDealQuery] = useState('');
+  const [dealResults, setDealResults] = useState([]);
   const [rejectModal, setRejectModal] = useState({ open: false, id: null });
   const [rejectReason, setRejectReason] = useState('');
 
@@ -36,6 +39,15 @@ const SuperAdminDashboard = () => {
       setFeatured(data || []);
     } catch {
       setFeatured([]);
+    }
+  };
+
+  const loadDealOfTheDay = async () => {
+    try {
+      const { data } = await api.get('/admin/deal-of-the-day').catch(() => ({ data: null }));
+      setDealOfTheDay(data || null);
+    } catch {
+      setDealOfTheDay(null);
     }
   };
 
@@ -55,6 +67,7 @@ const SuperAdminDashboard = () => {
       setOrders(ordersRes.data || []);
       setAnalyticsBiz(analyticsRes.data?.businesses || []);
       await loadFeatured();
+      await loadDealOfTheDay();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Load failed');
     } finally {
@@ -80,6 +93,20 @@ const SuperAdminDashboard = () => {
     }
   };
 
+  const searchProductsForDeal = async (e) => {
+    e?.preventDefault?.();
+    if (!dealQuery.trim()) {
+      setDealResults([]);
+      return;
+    }
+    try {
+      const { data } = await api.get('/admin/products', { params: { q: dealQuery.trim(), limit: 20 } });
+      setDealResults(data || []);
+    } catch {
+      toast.error('Search failed');
+    }
+  };
+
   const featureProduct = async (productId) => {
     setFeatLoading(true);
     try {
@@ -95,6 +122,21 @@ const SuperAdminDashboard = () => {
     }
   };
 
+  const setDealProductOfDay = async (productId) => {
+    setFeatLoading(true);
+    try {
+      await api.post(`/admin/deal-of-the-day/${productId}`);
+      toast.success('Deal of the Day set successfully');
+      setDealResults([]);
+      setDealQuery('');
+      await loadDealOfTheDay();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to set deal');
+    } finally {
+      setFeatLoading(false);
+    }
+  };
+
   const unfeature = async (productId) => {
     try {
       await api.delete(`/admin/featured/${productId}`);
@@ -102,6 +144,16 @@ const SuperAdminDashboard = () => {
       await loadFeatured();
     } catch {
       toast.error('Remove failed');
+    }
+  };
+
+  const clearDealOfTheDay = async () => {
+    try {
+      await api.delete('/admin/deal-of-the-day');
+      toast.success('Deal cleared');
+      await loadDealOfTheDay();
+    } catch {
+      toast.error('Clear deal failed');
     }
   };
 
@@ -152,27 +204,27 @@ const SuperAdminDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <FaShieldAlt className="text-emerald-400 text-2xl" />
+    <div className="admin-shell">
+      <header className="admin-header">
+        <div className="admin-brand">
+          <div className="admin-brand__icon"><FaShieldAlt /></div>
           <div>
-            <h1 className="text-xl font-bold">Duka Yetu Super Admin</h1>
-            <p className="text-sm text-slate-300">{user?.username}</p>
+            <h1>Duka Yetu Super Admin</h1>
+            <p>{user?.username}</p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <button type="button" onClick={load} className="px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 flex items-center gap-2">
+        <div className="admin-actions">
+          <button type="button" onClick={load} className="admin-action admin-action--ghost">
             <FaSync /> Refresh
           </button>
-          <button type="button" onClick={handleLogout} className="px-3 py-2 rounded-lg bg-red-600 hover:bg-red-500 flex items-center gap-2">
+          <button type="button" onClick={handleLogout} className="admin-action admin-action--danger">
             <FaSignOutAlt /> Logout
           </button>
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto p-6 space-y-6">
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+      <main className="admin-main">
+        <div className="admin-stat-grid">
           {[
             ['Businesses', overview?.total_businesses],
             ['Pending', overview?.pending_businesses],
@@ -183,45 +235,40 @@ const SuperAdminDashboard = () => {
             ['Commission', overview?.platform_commission != null ? formatCurrency(overview.platform_commission) : '—'],
             ['Featured live', overview?.featured_active],
           ].map(([label, value]) => (
-            <div key={label} className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
-              <p className="text-xs text-gray-500">{label}</p>
-              <p className="text-xl font-bold text-gray-800 mt-1">{value ?? '—'}</p>
+            <div key={label} className="admin-stat-card">
+              <p>{label}</p>
+              <strong>{value ?? '—'}</strong>
             </div>
           ))}
         </div>
 
-        {/* Business performance analytics */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-          <h2 className="font-bold text-gray-800 flex items-center gap-2 mb-1">
-            <FaChartLine className="text-primary-600" /> Business performance
-          </h2>
-          <p className="text-sm text-gray-500 mb-4">Sales, online GMV, and commission per registered shop</p>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+        <div className="admin-panel">
+          <div className="admin-panel__title">
+            <h2><FaChartLine /> Business performance</h2>
+          </div>
+          <p className="admin-panel__subtitle">Sales, online GMV, and commission per registered shop</p>
+          <div className="admin-table-wrap">
+            <table className="admin-table">
               <thead>
-                <tr className="text-left text-gray-500 border-b">
-                  <th className="py-2 pr-3">Business</th>
-                  <th className="py-2 pr-3">Plan</th>
-                  <th className="py-2 pr-3">POS sales</th>
-                  <th className="py-2 pr-3">Online</th>
-                  <th className="py-2 pr-3">Platform cut</th>
-                  <th className="py-2">Invoice</th>
+                <tr>
+                  <th>Business</th>
+                  <th>Plan</th>
+                  <th>POS sales</th>
+                  <th>Online</th>
+                  <th>Platform cut</th>
+                  <th>Invoice</th>
                 </tr>
               </thead>
               <tbody>
                 {(analyticsBiz.length ? analyticsBiz : businesses).slice(0, 50).map((biz) => (
-                  <tr key={biz.id} className="border-b border-gray-50">
-                    <td className="py-2 pr-3 font-medium">{biz.name}</td>
-                    <td className="py-2 pr-3 text-gray-500">{biz.package}</td>
-                    <td className="py-2 pr-3">{formatCurrency(biz.sales_revenue || 0)} <span className="text-xs text-gray-400">({biz.sales_count || 0})</span></td>
-                    <td className="py-2 pr-3">{formatCurrency(biz.online_revenue || 0)}</td>
-                    <td className="py-2 pr-3 text-emerald-700">{formatCurrency(biz.platform_commission || 0)}</td>
-                    <td className="py-2">
-                      <button
-                        type="button"
-                        onClick={() => downloadInvoice(biz.id, biz.name)}
-                        className="text-xs px-2 py-1 rounded bg-slate-900 text-white flex items-center gap-1"
-                      >
+                  <tr key={biz.id}>
+                    <td>{biz.name}</td>
+                    <td>{biz.package}</td>
+                    <td>{formatCurrency(biz.sales_revenue || 0)} <span>({biz.sales_count || 0})</span></td>
+                    <td>{formatCurrency(biz.online_revenue || 0)}</td>
+                    <td className="admin-table__green">{formatCurrency(biz.platform_commission || 0)}</td>
+                    <td>
+                      <button type="button" onClick={() => downloadInvoice(biz.id, biz.name)} className="admin-table__button">
                         <FaFileInvoice /> Sub invoice
                       </button>
                     </td>
@@ -230,79 +277,130 @@ const SuperAdminDashboard = () => {
               </tbody>
             </table>
             {!analyticsBiz.length && !businesses.length && (
-              <p className="text-sm text-gray-400 py-4">No businesses yet</p>
+              <p className="admin-empty">No businesses yet</p>
             )}
           </div>
         </div>
 
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-          <h2 className="font-bold text-gray-800 flex items-center gap-2 mb-1">
-            <FaStar className="text-amber-500" /> Store hero featured products
-          </h2>
-          <p className="text-sm text-gray-500 mb-4">
-            Featured slots last <strong>30 days</strong> by default. Days remaining shown for admin only.
-          </p>
-          <div className="grid md:grid-cols-3 gap-3 mb-4">
-            <form onSubmit={searchProducts} className="md:col-span-2 flex gap-2">
-              <div className="relative flex-1">
-                <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm" />
-                <input value={productQuery} onChange={(e) => setProductQuery(e.target.value)} className="input-primary pl-9" placeholder="Search product, SKU, or shop..." />
+        <div className="admin-panel">
+          <div className="admin-panel__title">
+            <h2><FaStar /> Store hero featured products</h2>
+          </div>
+          <p className="admin-panel__subtitle">Featured slots last <strong>30 days</strong> by default. Days remaining shown for admin only.</p>
+          <div className="admin-feature-controls">
+            <form onSubmit={searchProducts} className="admin-search-form">
+              <div className="admin-search-box">
+                <FaSearch />
+                <input value={productQuery} onChange={(e) => setProductQuery(e.target.value)} placeholder="Search product, SKU, or shop..." />
               </div>
-              <button type="submit" className="btn-primary">Search</button>
+              <button type="submit" className="admin-primary-button">Search</button>
             </form>
-            <div className="flex gap-2">
-              <input type="number" min={1} max={90} value={featureDays} onChange={(e) => setFeatureDays(parseInt(e.target.value, 10) || 30)} className="input-primary w-24" title="Days" />
-              <input value={badgeText} onChange={(e) => setBadgeText(e.target.value)} className="input-primary flex-1" placeholder="Badge text" />
+            <div className="admin-feature-inline">
+              <input type="number" min={1} max={90} value={featureDays} onChange={(e) => setFeatureDays(parseInt(e.target.value, 10) || 30)} title="Days" />
+              <input value={badgeText} onChange={(e) => setBadgeText(e.target.value)} placeholder="Badge text" />
             </div>
           </div>
           {productResults.length > 0 && (
-            <div className="border border-gray-100 rounded-lg divide-y mb-4 max-h-56 overflow-y-auto">
+            <div className="admin-search-results">
               {productResults.map((p) => (
-                <div key={p.id} className="flex items-center justify-between gap-3 p-3 text-sm">
-                  <div className="flex items-center gap-3 min-w-0">
-                    {p.image_url ? <img src={p.image_url} alt="" className="w-10 h-10 rounded object-cover" /> : <div className="w-10 h-10 rounded bg-gray-100" />}
-                    <div className="min-w-0">
-                      <p className="font-medium truncate">{p.name}</p>
-                      <p className="text-xs text-gray-400 truncate">{p.business_name} · {formatCurrency(p.selling_price)}</p>
+                <div key={p.id} className="admin-search-result">
+                  <div className="admin-search-result__meta">
+                    {p.image_url ? <img src={p.image_url} alt="" /> : <div className="admin-empty-thumb" />}
+                    <div>
+                      <p>{p.name}</p>
+                      <small>{p.business_name} · {formatCurrency(p.selling_price)}</small>
                     </div>
                   </div>
-                  <button type="button" disabled={featLoading} onClick={() => featureProduct(p.id)} className="shrink-0 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold flex items-center gap-1">
+                  <button type="button" disabled={featLoading} onClick={() => featureProduct(p.id)} className="admin-primary-button admin-primary-button--small">
                     <FaStar /> Feature
                   </button>
                 </div>
               ))}
             </div>
           )}
-          <h3 className="text-sm font-semibold text-gray-700 mb-2">Active on hero ({featured.length})</h3>
+          <h3 className="admin-panel__small-title">Active on hero ({featured.length})</h3>
           {featured.length === 0 ? (
-            <p className="text-sm text-gray-400">No featured products yet.</p>
+            <p className="admin-empty">No featured products yet.</p>
           ) : (
-            <div className="grid sm:grid-cols-2 gap-3">
+            <div className="admin-feature-list">
               {featured.map((p) => (
-                <div key={p.id} className="flex items-center gap-3 border border-gray-100 rounded-lg p-3">
-                  {p.image_url ? <img src={p.image_url} alt="" className="w-14 h-14 rounded-lg object-cover" /> : <div className="w-14 h-14 rounded-lg bg-gray-100" />}
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm truncate">{p.name}</p>
-                    <p className="text-xs text-gray-400 truncate">{p.business_name}</p>
-                    <p className="text-xs font-semibold text-amber-700 mt-0.5">
+                <div key={p.id} className="admin-feature-item">
+                  {p.image_url ? <img src={p.image_url} alt="" /> : <div className="admin-empty-thumb admin-empty-thumb--large" />}
+                  <div className="admin-feature-item__meta">
+                    <p>{p.name}</p>
+                    <small>{p.business_name}</small>
+                    <span>
                       {p.days_remaining != null ? `${p.days_remaining} day${p.days_remaining === 1 ? '' : 's'} left` : 'No end date'}
                       {p.featured_until ? ` · until ${formatDate(p.featured_until)}` : ''}
-                    </p>
+                    </span>
                   </div>
-                  <button type="button" onClick={() => unfeature(p.id)} className="p-2 text-gray-400 hover:text-red-500"><FaTrash /></button>
+                  <button type="button" onClick={() => unfeature(p.id)} className="admin-remove-button"><FaTrash /></button>
                 </div>
               ))}
             </div>
           )}
         </div>
 
+        <div className="admin-panel">
+          <div className="admin-panel__title">
+            <h2><FaStar /> Deal of the Day</h2>
+          </div>
+          <p className="admin-panel__subtitle">Set a featured product as the daily deal. Updates marketplace promotional banner.</p>
+          <div className="admin-feature-controls">
+            <form onSubmit={searchProductsForDeal} className="admin-search-form">
+              <div className="admin-search-box">
+                <FaSearch />
+                <input value={dealQuery} onChange={(e) => setDealQuery(e.target.value)} placeholder="Search product for deal..." />
+              </div>
+              <button type="submit" className="admin-primary-button">Search</button>
+            </form>
+          </div>
+          {dealResults.length > 0 && (
+            <div className="admin-search-results">
+              {dealResults.map((p) => (
+                <div key={p.id} className="admin-search-result">
+                  <div className="admin-search-result__meta">
+                    {p.image_url ? <img src={p.image_url} alt="" /> : <div className="admin-empty-thumb" />}
+                    <div>
+                      <p>{p.name}</p>
+                      <small>{p.business_name} · {formatCurrency(p.selling_price)}</small>
+                    </div>
+                  </div>
+                  <button type="button" disabled={featLoading} onClick={() => setDealProductOfDay(p.id)} className="admin-primary-button admin-primary-button--small">
+                    <FaStar /> Set Deal
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          {dealOfTheDay && (
+            <div>
+              <h3 className="admin-panel__small-title">Current Deal of the Day</h3>
+              <div className="admin-feature-list">
+                <div className="admin-feature-item">
+                  {dealOfTheDay.image_url ? <img src={dealOfTheDay.image_url} alt="" /> : <div className="admin-empty-thumb admin-empty-thumb--large" />}
+                  <div className="admin-feature-item__meta">
+                    <p>{dealOfTheDay.name}</p>
+                    <small>{dealOfTheDay.business_name}</small>
+                    <span>{formatCurrency(dealOfTheDay.selling_price)}</span>
+                  </div>
+                  <button type="button" onClick={() => clearDealOfTheDay()} className="admin-remove-button"><FaTrash /></button>
+                </div>
+              </div>
+            </div>
+          )}
+          {!dealOfTheDay && dealResults.length === 0 && (
+            <p className="admin-empty admin-empty--large">No deal set. Search and select a product above.</p>
+          )}
+        </div>
+
         {notifications.length > 0 && (
-          <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4">
-            <h2 className="font-bold text-emerald-800 mb-2">Live marketplace alerts</h2>
-            <div className="space-y-2 max-h-48 overflow-y-auto">
+          <div className="admin-alert-box">
+            <h2>Live marketplace alerts</h2>
+            <div className="admin-alert-list">
               {notifications.slice(0, 10).map((note) => (
-                <div key={note.id} className="text-sm text-emerald-900">
-                  <span className="font-medium">{note.title}:</span> {note.message}
+                <div key={note.id}>
+                  <span>{note.title}:</span> {note.message}
                 </div>
               ))}
             </div>
@@ -310,62 +408,60 @@ const SuperAdminDashboard = () => {
         )}
 
         {orders.length > 0 && (
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-            <h2 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
-              <FaMoneyBillWave className="text-green-600" /> Recent marketplace orders
-            </h2>
-            <div className="space-y-2">
+          <div className="admin-panel admin-panel--compact">
+            <div className="admin-panel__title">
+              <h2><FaMoneyBillWave /> Recent marketplace orders</h2>
+            </div>
+            <div className="admin-order-list">
               {orders.slice(0, 8).map((order) => (
-                <div key={order.id} className="flex justify-between text-sm border-b border-gray-50 pb-2">
+                <div key={order.id} className="admin-order-item">
                   <span>{order.order_number} · {order.customer_name}</span>
-                  <span className="font-medium">KES {order.total_amount} · {order.payment_status}</span>
+                  <strong>KES {order.total_amount} · {order.payment_status}</strong>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
-          <div className="p-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
-            <h2 className="font-bold text-gray-800 flex items-center gap-2">
-              <FaStore className="text-primary-600" /> Business Approvals
-            </h2>
-            <div className="flex gap-2">
+        <div className="admin-panel admin-panel--table">
+          <div className="admin-panel__header">
+            <h2><FaStore /> Business approvals</h2>
+            <div className="admin-filter-row">
               {['PENDING', 'APPROVED', 'REJECTED', ''].map((status) => (
-                <button key={status || 'ALL'} type="button" onClick={() => setFilter(status)} className={`px-3 py-1.5 rounded-lg text-sm ${filter === status ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
+                <button key={status || 'ALL'} type="button" onClick={() => setFilter(status)} className={`admin-filter ${filter === status ? 'is-active' : ''}`}>
                   {status || 'ALL'}
                 </button>
               ))}
             </div>
           </div>
           {loading ? (
-            <div className="p-8 text-center text-gray-400">Loading...</div>
+            <div className="admin-empty admin-empty--large">Loading...</div>
           ) : businesses.length === 0 ? (
-            <div className="p-8 text-center text-gray-400">No businesses in this filter</div>
+            <div className="admin-empty admin-empty--large">No businesses in this filter</div>
           ) : (
-            <div className="divide-y divide-gray-100">
+            <div className="admin-approval-list">
               {businesses.map((biz) => (
-                <div key={biz.id} className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div key={biz.id} className="admin-approval-item">
                   <div>
-                    <p className="font-semibold text-gray-800">{biz.name}</p>
-                    <p className="text-sm text-gray-500">{biz.owner_name} · {biz.email} · {biz.phone}</p>
-                    <p className="text-xs text-gray-400 mt-1">
+                    <p className="admin-approval-name">{biz.name}</p>
+                    <p className="admin-approval-meta">{biz.owner_name} · {biz.email} · {biz.phone}</p>
+                    <p className="admin-approval-meta admin-approval-meta--small">
                       Registered {formatDate(biz.created_at)} · {biz.package} · {biz.products_count} products
                       {biz.sales_revenue != null && ` · POS ${formatCurrency(biz.sales_revenue)}`}
                     </p>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${biz.approval_status === 'APPROVED' ? 'bg-green-100 text-green-700' : biz.approval_status === 'REJECTED' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>{biz.approval_status}</span>
+                  <div className="admin-approval-actions">
+                    <span className={`admin-status ${biz.approval_status === 'APPROVED' ? 'approved' : biz.approval_status === 'REJECTED' ? 'rejected' : 'pending'}`}>{biz.approval_status}</span>
                     {biz.approval_status === 'APPROVED' && (
-                      <button type="button" onClick={() => downloadInvoice(biz.id, biz.name)} className="px-3 py-2 rounded-lg bg-slate-800 text-white text-sm flex items-center gap-1">
+                      <button type="button" onClick={() => downloadInvoice(biz.id, biz.name)} className="admin-action admin-action--neutral">
                         <FaFileInvoice /> Invoice
                       </button>
                     )}
                     {biz.approval_status !== 'APPROVED' && (
-                      <button type="button" onClick={() => approve(biz.id)} className="px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm flex items-center gap-1"><FaCheck /> Approve</button>
+                      <button type="button" onClick={() => approve(biz.id)} className="admin-action admin-action--success"><FaCheck /> Approve</button>
                     )}
                     {biz.approval_status !== 'REJECTED' && (
-                      <button type="button" onClick={() => { setRejectModal({ open: true, id: biz.id }); setRejectReason(''); }} className="px-3 py-2 rounded-lg bg-red-600 text-white text-sm flex items-center gap-1"><FaTimes /> Reject</button>
+                      <button type="button" onClick={() => { setRejectModal({ open: true, id: biz.id }); setRejectReason(''); }} className="admin-action admin-action--danger"><FaTimes /> Reject</button>
                     )}
                   </div>
                 </div>

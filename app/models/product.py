@@ -27,6 +27,8 @@ class Product(Base):
     is_featured = Column(Boolean, default=False, nullable=False)
     featured_until = Column(DateTime, nullable=True)
     featured_badge = Column(String(50), nullable=True)  # e.g. "Save 30%"
+    is_deal_of_day = Column(Boolean, default=False, nullable=False)
+    deal_of_day_until = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     

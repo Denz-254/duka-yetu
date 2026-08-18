@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FaEnvelope, FaLock, FaStore } from 'react-icons/fa';
+import { FaEnvelope, FaLock, FaStore, FaEye, FaEyeSlash } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
 import useAuthStore from '../store/authStore';
 
 const LoginPage = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const login = useAuthStore((state) => state.login);
   const loading = useAuthStore((state) => state.loading);
   const navigate = useNavigate();
@@ -39,82 +40,97 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-primary-100 px-4">
+    <div className="register-shell">
       <motion.div
-        initial={{ opacity: 0, y: -20 }}
+        initial={{ opacity: 0, y: -18 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="w-full max-w-md"
+        transition={{ duration: 0.45 }}
+        className="register-panel"
       >
-        <div className="text-center mb-8">
-          <div className="inline-block p-3 bg-primary-600 rounded-2xl mb-4">
-            <FaStore className="text-white text-4xl" />
+        <div className="register-hero">
+          <div className="register-brand">
+            <div className="register-logo">
+              <FaStore />
+            </div>
+            <div>
+              <div className="register-brand-name">Duka Yetu</div>
+              <div className="register-brand-tag">Powering local businesses</div>
+            </div>
           </div>
-          <h1 className="text-3xl font-bold text-gray-800">Duka Yetu</h1>
-          <p className="text-gray-600 mt-2">Welcome back! Please login to continue</p>
+
+          <h1>Manage your business with confidence</h1>
+          <p>
+            Track sales, manage inventory, monitor customers, and grow your store from one secure workspace.
+          </p>
+
+          <ul className="register-points">
+            <li>Live sales & performance tracking</li>
+            <li>Inventory and stock control</li>
+            <li>Marketplace growth and digital payments</li>
+          </ul>
         </div>
 
-        <div className="card">
-          <form onSubmit={handleSubmit}>
-            <div className="mb-4">
-              <label className="label-primary">Username</label>
-              <div className="relative">
-                <FaEnvelope className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+        <div className="register-form-wrap">
+          <div className="register-header">
+            <div>
+              <p className="register-kicker">Welcome back</p>
+              <h2>Sign in</h2>
+            </div>
+            <Link to="/register">Create account</Link>
+          </div>
+
+          <form onSubmit={handleSubmit} className="register-form">
+            <label className="register-field">
+              <span>Username</span>
+              <div className="register-input-wrap">
+                <FaEnvelope className="register-input-icon" />
                 <input
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  className="input-primary pl-10"
                   placeholder="Enter your username"
                   required
                 />
               </div>
-            </div>
+            </label>
 
-            <div className="mb-6">
-              <label className="label-primary">Password</label>
-              <div className="relative">
-                <FaLock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <label className="register-field">
+              <span>Password</span>
+              <div className="register-input-wrap">
+                <FaLock className="register-input-icon" />
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="input-primary pl-10"
                   placeholder="Enter your password"
                   required
                 />
+                <button
+                  type="button"
+                  className="register-password-toggle"
+                  onClick={() => setShowPassword((value) => !value)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <FaEyeSlash /> : <FaEye />}
+                </button>
               </div>
-            </div>
+            </label>
 
-            <div className="mb-2 text-right">
-              <Link to="/forgot-password" className="text-sm text-primary-600 hover:text-primary-700">
+            <div style={{ textAlign: 'right' }}>
+              <Link to="/forgot-password" className="register-footer-text" style={{ fontSize: '0.8rem' }}>
                 Forgot password?
               </Link>
             </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="btn-primary w-full text-lg py-3"
-            >
-              {loading ? 'Logging in...' : 'Login'}
+            <button type="submit" disabled={loading} className="register-submit">
+              {loading ? 'Signing in...' : 'Sign in'}
             </button>
           </form>
 
-          <div className="mt-4 text-center space-y-2">
-            <p className="text-gray-600">
-              Business owner?{' '}
-              <Link to="/register" className="text-primary-600 hover:text-primary-700 font-medium">
-                Register shop
-              </Link>
-            </p>
-            <p className="text-gray-600 text-sm">
-              Shopping online?{' '}
-              <Link to="/shop/register" className="text-primary-600 hover:text-primary-700 font-medium">
-                Create shopper account
-              </Link>
-            </p>
-          </div>
+          <p className="register-footer-text">
+            Shopping online?{' '}
+            <Link to="/shop/register">Create shopper account</Link>
+          </p>
         </div>
       </motion.div>
     </div>

@@ -1,6 +1,16 @@
 import { useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
-import { FaArrowLeft, FaDownload, FaMobileAlt } from 'react-icons/fa';
+import {
+  FaArrowLeft,
+  FaDownload,
+  FaMobileAlt,
+  FaMapMarkerAlt,
+  FaUser,
+  FaEnvelope,
+  FaPhone,
+  FaCheckCircle,
+  FaShoppingBag,
+} from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
 import api from '../api/client';
 import useMarketCartStore from '../store/marketCartStore';
@@ -23,6 +33,9 @@ const MarketplaceCheckoutPage = () => {
     customer_phone: user?.phone || '',
     customer_email: user?.email || '',
     delivery_address: '',
+    delivery_city: '',
+    delivery_county: '',
+    delivery_landmark: '',
   });
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('');
@@ -60,12 +73,21 @@ const MarketplaceCheckoutPage = () => {
     if (!form.customer_name.trim() || !form.customer_phone.trim()) {
       return toast.error('Name and phone required');
     }
+    if (!form.delivery_address.trim() || !form.delivery_city.trim() || !form.delivery_county.trim()) {
+      return toast.error('Delivery address, city and county are required');
+    }
 
     setLoading(true);
     setStatus('Sending STK Push...');
     try {
       const { data } = await api.post('/marketplace/checkout', {
         ...form,
+        delivery_address: [
+          form.delivery_address,
+          form.delivery_city,
+          form.delivery_county,
+          form.delivery_landmark,
+        ].filter(Boolean).join(', '),
         items: items.map((item) => ({ product_id: item.id, quantity: item.quantity })),
       }, { timeout: 45000 });
 
@@ -124,87 +146,182 @@ const MarketplaceCheckoutPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="checkout-shell">
       <Seo title="Checkout | DukaMall" description="Pay securely with M-Pesa on DukaMall." path="/shop/checkout" />
-      <div className="max-w-5xl mx-auto px-4 py-6">
-        <Link to="/shop" className="inline-flex items-center gap-2 text-gray-600 mb-4">
-          <FaArrowLeft /> Back to shop
-        </Link>
-        <p className="text-xs text-gray-500 mb-3">
-          Signed in as {user?.name || user?.email} ·{' '}
-          <Link to="/shop/register" className="text-primary-600">Shopper accounts</Link>
-        </p>
-        <div className="grid md:grid-cols-5 gap-4">
-          <div className="md:col-span-3 bg-white rounded-lg shadow-sm border border-gray-100 p-4 space-y-3">
-            <h2 className="font-bold text-gray-800">Cart ({items.length})</h2>
-            {items.length === 0 && <p className="text-gray-400 py-8 text-center">Your cart is empty</p>}
+
+      <div className="checkout-inner">
+        <div className="checkout-toolbar">
+          <Link to="/shop" className="checkout-back">
+            <FaArrowLeft /> Back to shop
+          </Link>
+          <p className="checkout-account">
+            Signed in as {user?.name || user?.email} ·{' '}
+            <Link to="/shop/register">Shopper accounts</Link>
+          </p>
+        </div>
+
+        <div className="checkout-grid">
+          <section className="checkout-panel checkout-panel--cart">
+            <div className="checkout-panel__header">
+              <div>
+                <p className="checkout-kicker">Your cart</p>
+                <h2>{items.length} item{items.length === 1 ? '' : 's'}</h2>
+              </div>
+              <span className="checkout-chip"><FaShoppingBag /> {items.length}</span>
+            </div>
+
+            {items.length === 0 && <p className="checkout-empty">Your cart is empty</p>}
+
             {items.map((item) => (
-              <div key={item.id} className="flex gap-3 border-b border-gray-100 pb-3">
-                <div className="w-16 h-16 bg-gray-100 rounded overflow-hidden">
-                  {item.image_url && <img src={item.image_url} alt="" className="w-full h-full object-cover" />}
+              <div key={item.id} className="checkout-item">
+                <div className="checkout-item__image">
+                  {item.image_url && <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />}
                 </div>
-                <div className="flex-1">
-                  <p className="font-medium text-sm">{item.name}</p>
-                  <p className="text-xs text-gray-400">{item.business_name}</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <button type="button" onClick={() => updateQuantity(item.id, item.quantity - 1)} className="px-2 border rounded">-</button>
+
+                <div className="checkout-item__body">
+                  <div>
+                    <p className="checkout-item__name">{item.name}</p>
+                    <p className="checkout-item__merchant">{item.business_name}</p>
+                  </div>
+
+                  <div className="checkout-item__controls">
+                    <button type="button" onClick={() => updateQuantity(item.id, item.quantity - 1)} aria-label="Decrease quantity">-</button>
                     <span>{item.quantity}</span>
-                    <button type="button" onClick={() => updateQuantity(item.id, item.quantity + 1)} className="px-2 border rounded">+</button>
-                    <button type="button" onClick={() => removeItem(item.id)} className="text-xs text-red-500 ml-2">Remove</button>
+                    <button type="button" onClick={() => updateQuantity(item.id, item.quantity + 1)} aria-label="Increase quantity">+</button>
+                    <button type="button" className="checkout-remove" onClick={() => removeItem(item.id)}>Remove</button>
                   </div>
                 </div>
-                <p className="font-semibold">{formatCurrency(item.selling_price * item.quantity)}</p>
+
+                <p className="checkout-item__price">{formatCurrency(item.selling_price * item.quantity)}</p>
               </div>
             ))}
-          </div>
+          </section>
 
-          <div className="md:col-span-2 bg-white rounded-lg shadow-sm border border-gray-100 p-4 space-y-3 h-fit">
-            <h2 className="font-bold text-gray-800">Checkout</h2>
+          <aside className="checkout-panel checkout-panel--summary">
+            <div className="checkout-panel__header">
+              <div>
+                <p className="checkout-kicker">Delivery details</p>
+                <h2>Checkout</h2>
+              </div>
+            </div>
+
             {sellers.length > 1 && (
-              <p className="text-xs text-red-600 bg-red-50 p-2 rounded">
+              <p className="checkout-alert">
                 One seller per checkout — remove other shops&apos; items.
               </p>
             )}
-            <input
-              className="input-primary bg-white text-gray-800"
-              placeholder="Full name"
-              value={form.customer_name}
-              onChange={(e) => setForm({ ...form, customer_name: e.target.value })}
-            />
-            <input
-              className="input-primary bg-white text-gray-800"
-              placeholder="M-Pesa phone 07XXXXXXXX"
-              value={form.customer_phone}
-              onChange={(e) => setForm({ ...form, customer_phone: e.target.value })}
-            />
-            <input
-              className="input-primary bg-white text-gray-800"
-              placeholder="Email (for invoice & updates)"
-              value={form.customer_email}
-              onChange={(e) => setForm({ ...form, customer_email: e.target.value })}
-            />
-            <textarea
-              className="input-primary bg-white text-gray-800"
-              placeholder="Delivery address"
-              rows={3}
-              value={form.delivery_address}
-              onChange={(e) => setForm({ ...form, delivery_address: e.target.value })}
-            />
-            <div className="flex justify-between font-bold text-lg border-t pt-3">
-              <span>Total</span>
-              <span>{formatCurrency(total())}</span>
+
+            <div className="checkout-form">
+              <label className="checkout-field">
+                <span>Full name</span>
+                <div className="checkout-input-wrap">
+                  <FaUser className="checkout-input-icon" />
+                  <input
+                    value={form.customer_name}
+                    onChange={(e) => setForm({ ...form, customer_name: e.target.value })}
+                    placeholder="Full name"
+                  />
+                </div>
+              </label>
+
+              <label className="checkout-field">
+                <span>Phone</span>
+                <div className="checkout-input-wrap">
+                  <FaPhone className="checkout-input-icon" />
+                  <input
+                    value={form.customer_phone}
+                    onChange={(e) => setForm({ ...form, customer_phone: e.target.value })}
+                    placeholder="07XXXXXXXX"
+                  />
+                </div>
+              </label>
+
+              <label className="checkout-field">
+                <span>Email</span>
+                <div className="checkout-input-wrap">
+                  <FaEnvelope className="checkout-input-icon" />
+                  <input
+                    value={form.customer_email}
+                    onChange={(e) => setForm({ ...form, customer_email: e.target.value })}
+                    placeholder="Email for invoice"
+                  />
+                </div>
+              </label>
+
+              <label className="checkout-field">
+                <span>Street address</span>
+                <div className="checkout-input-wrap">
+                  <FaMapMarkerAlt className="checkout-input-icon" />
+                  <input
+                    value={form.delivery_address}
+                    onChange={(e) => setForm({ ...form, delivery_address: e.target.value })}
+                    placeholder="House number / street"
+                  />
+                </div>
+              </label>
+
+              <div className="checkout-double-fields">
+                <label className="checkout-field">
+                  <span>City</span>
+                  <input
+                    value={form.delivery_city}
+                    onChange={(e) => setForm({ ...form, delivery_city: e.target.value })}
+                    placeholder="Nairobi"
+                  />
+                </label>
+
+                <label className="checkout-field">
+                  <span>County</span>
+                  <input
+                    value={form.delivery_county}
+                    onChange={(e) => setForm({ ...form, delivery_county: e.target.value })}
+                    placeholder="Nairobi County"
+                  />
+                </label>
+              </div>
+
+              <label className="checkout-field">
+                <span>Landmark / notes</span>
+                <textarea
+                  rows={3}
+                  value={form.delivery_landmark}
+                  onChange={(e) => setForm({ ...form, delivery_landmark: e.target.value })}
+                  placeholder="Near the market, gate, apartment block, etc."
+                />
+              </label>
             </div>
-            {status && <p className="text-xs text-green-700">{status}</p>}
+
+            <div className="checkout-summary">
+              <div className="checkout-summary__row">
+                <span>Subtotal</span>
+                <strong>{formatCurrency(total())}</strong>
+              </div>
+              <div className="checkout-summary__row">
+                <span>Delivery</span>
+                <strong>Calculated at checkout</strong>
+              </div>
+              <div className="checkout-summary__row checkout-summary__row--total">
+                <span>Total</span>
+                <strong>{formatCurrency(total())}</strong>
+              </div>
+            </div>
+
+            {status && (
+              <div className="checkout-status">
+                <FaCheckCircle /> {status}
+              </div>
+            )}
+
             <button
               type="button"
               disabled={loading || !items.length}
               onClick={pay}
-              className="w-full py-3 rounded-md bg-green-600 hover:bg-green-700 text-white font-bold flex items-center justify-center gap-2 disabled:opacity-60"
+              className="checkout-pay"
             >
               <FaMobileAlt />
               {loading ? 'Waiting for M-Pesa...' : 'Pay with M-Pesa'}
             </button>
-          </div>
+          </aside>
         </div>
       </div>
     </div>
