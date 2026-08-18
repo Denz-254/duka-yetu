@@ -171,6 +171,26 @@ def _sale_receipt_response(db: Session, sale: Sale, cashier: User) -> SaleReceip
     )
 
 
+@router.get("/mpesa/mode")
+def mpesa_collection_mode(
+    business: Business = Depends(get_current_business),
+    current_user: User = Depends(get_pos_user),
+    _access: Business = Depends(require_feature("pos")),
+):
+    """Tell the POS whether this shop uses till, paybill, or send-money."""
+    payment = (business.settings or {}).get("payment") or {}
+    account_type = str(payment.get("mpesa_account_type") or "paybill").strip().lower()
+    if account_type not in {"paybill", "till", "send_money"}:
+        account_type = "paybill"
+    send_phone = (payment.get("mpesa_send_money_phone") or business.phone or "").strip()
+    return {
+        "account_type": account_type,
+        "send_money_phone": send_phone,
+        "stk_available": account_type in {"paybill", "till"} or bool(settings.MPESA_CONSUMER_KEY),
+        "mpesa_enabled": payment.get("mpesa_enabled", True) is not False,
+    }
+
+
 @router.post("/mpesa/stk-push", response_model=StkPushResponse, status_code=201)
 async def stk_push(
     payload: StkPushRequest,

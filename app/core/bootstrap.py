@@ -94,6 +94,19 @@ def ensure_schema_patches(db: Session) -> None:
         db.commit()
         print("Schema patch: users.password_reset_expires added")
 
+    if not _column_exists(db, "products", "is_deal_of_day"):
+        db.execute(text("ALTER TABLE products ADD COLUMN is_deal_of_day BOOLEAN NOT NULL DEFAULT false"))
+        db.commit()
+        print("Schema patch: products.is_deal_of_day added")
+    if not _column_exists(db, "products", "deal_of_day_until"):
+        db.execute(text("ALTER TABLE products ADD COLUMN deal_of_day_until TIMESTAMP"))
+        db.commit()
+        print("Schema patch: products.deal_of_day_until added")
+    if not _column_exists(db, "products", "listed_on_marketplace"):
+        db.execute(text("ALTER TABLE products ADD COLUMN listed_on_marketplace BOOLEAN NOT NULL DEFAULT true"))
+        db.commit()
+        print("Schema patch: products.listed_on_marketplace added")
+
 
 def ensure_super_admin(db: Session) -> None:
     """Create or refresh the platform super-admin account from env credentials."""

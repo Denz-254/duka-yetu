@@ -11,6 +11,7 @@ import {
 } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
 import { subscription as subscriptionApi } from '../api/endpoints';
+import { downloadBlob } from '../utils/helpers';
 
 const SubscriptionPage = () => {
   const [currentPlan, setCurrentPlan] = useState('basic');
@@ -191,13 +192,7 @@ const SubscriptionPage = () => {
   const downloadInvoiceHtml = async (paymentId) => {
     try {
       const { data } = await subscriptionApi.downloadInvoice(paymentId);
-      const blob = new Blob([data], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `invoice-${paymentId.slice(0, 8)}.html`;
-      a.click();
-      URL.revokeObjectURL(url);
+      downloadBlob(data, `invoice-${paymentId.slice(0, 8)}.pdf`);
       toast.success('Invoice downloaded');
     } catch {
       toast.error('Download failed');

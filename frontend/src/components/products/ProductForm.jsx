@@ -15,6 +15,7 @@ const ProductForm = ({ product, onSuccess, onCancel }) => {
     description: '',
     image_url: '',
     category_id: '',
+    listed_on_marketplace: false,
   });
   const [categoryOptions, setCategoryOptions] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -42,6 +43,7 @@ const ProductForm = ({ product, onSuccess, onCancel }) => {
         description: product.description || '',
         image_url: product.image_url || '',
         category_id: product.category_id || '',
+        listed_on_marketplace: Boolean(product.listed_on_marketplace),
       });
       setImagePreview(product.image_url || '');
     }
@@ -103,6 +105,7 @@ const ProductForm = ({ product, onSuccess, onCancel }) => {
         cost_price: parseFloat(formData.cost_price) || null,
         stock_quantity: parseInt(formData.stock_quantity) || 0,
         category_id: formData.category_id || null,
+        listed_on_marketplace: Boolean(formData.listed_on_marketplace),
       };
 
       if (product) {
@@ -275,6 +278,19 @@ const ProductForm = ({ product, onSuccess, onCancel }) => {
           placeholder="Product description"
         />
       </div>
+
+      <label className="flex items-start gap-3 p-3 rounded-lg border border-gray-100 bg-gray-50 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={Boolean(formData.listed_on_marketplace)}
+          onChange={(e) => setFormData({ ...formData, listed_on_marketplace: e.target.checked })}
+          className="mt-1"
+        />
+        <span>
+          <span className="block font-semibold text-gray-800">List on DukaMall</span>
+          <span className="block text-xs text-gray-500">Only selected products appear in the public shop.</span>
+        </span>
+      </label>
 
       <div className="flex gap-3 pt-2">
         <button

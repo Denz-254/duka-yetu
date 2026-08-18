@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
   FaPlus, FaSearch, FaEdit, FaTrash, FaTimes, FaImage, 
-  FaFilter, FaSort, FaEye, FaCopy, FaBarcode, FaBox, FaStar,
+  FaFilter, FaSort, FaEye, FaCopy, FaBarcode, FaBox, FaStar, FaStore,
   FaChevronLeft, FaChevronRight, FaDownload, FaUpload
 } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
@@ -31,7 +31,7 @@ const ProductsPage = () => {
   const isOwner = user?.role === 'OWNER';
 
   useEffect(() => {
-    fetchProducts();
+    fetchProducts({ limit: 100 });
   }, []);
 
   const handleFeature = async () => {
@@ -165,9 +165,43 @@ const ProductsPage = () => {
         {selectedProducts.length > 0 && (
           <div className="flex items-center gap-3 mt-4 pt-4 border-t border-gray-100">
             <span className="text-sm text-gray-500">{selectedProducts.length} selected</span>
-            <button className="text-sm text-red-500 hover:text-red-600 font-medium">Delete</button>
-            <button className="text-sm text-blue-500 hover:text-blue-600 font-medium">Export</button>
-            <button className="text-sm text-gray-500 hover:text-gray-600 font-medium">Deselect All</button>
+            {isOwner && (
+              <>
+                <button
+                  type="button"
+                  className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                  onClick={async () => {
+                    try {
+                      await productsApi.marketplaceListing(selectedProducts, true);
+                      toast.success('Listed on DukaMall');
+                      setSelectedProducts([]);
+                      fetchProducts({ limit: 100 });
+                    } catch {
+                      toast.error('Could not list products');
+                    }
+                  }}
+                >
+                  Add to DukaMall
+                </button>
+                <button
+                  type="button"
+                  className="text-sm text-gray-600 hover:text-gray-800 font-medium"
+                  onClick={async () => {
+                    try {
+                      await productsApi.marketplaceListing(selectedProducts, false);
+                      toast.success('Removed from DukaMall');
+                      setSelectedProducts([]);
+                      fetchProducts({ limit: 100 });
+                    } catch {
+                      toast.error('Could not update listing');
+                    }
+                  }}
+                >
+                  Remove from DukaMall
+                </button>
+              </>
+            )}
+            <button className="text-sm text-gray-500 hover:text-gray-600 font-medium" onClick={() => setSelectedProducts([])}>Deselect All</button>
           </div>
         )}
       </div>
@@ -192,17 +226,18 @@ const ProductsPage = () => {
                 <th className="text-right py-3 px-4 text-sm font-medium text-gray-500">Price</th>
                 <th className="text-right py-3 px-4 text-sm font-medium text-gray-500">Stock</th>
                 <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Status</th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">DukaMall</th>
                 <th className="text-right py-3 px-4 text-sm font-medium text-gray-500">Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="8" className="text-center py-12 text-gray-400">Loading products...</td>
+                  <td colSpan="9" className="text-center py-12 text-gray-400">Loading products...</td>
                 </tr>
               ) : products.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="text-center py-12 text-gray-400">
+                  <td colSpan="9" className="text-center py-12 text-gray-400">
                     <div className="text-6xl mb-4 text-gray-300 flex justify-center"><FaBox /></div>
                     <p>No products found</p>
                     {isOwner && (
@@ -266,6 +301,31 @@ const ProductsPage = () => {
                         <span className={`text-xs px-2 py-1 rounded-full ${stockStatus.color}`}>
                           {stockStatus.label}
                         </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        {isOwner ? (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                await productsApi.update(product.id, { listed_on_marketplace: !product.listed_on_marketplace });
+                                fetchProducts({ limit: 100 });
+                              } catch {
+                                toast.error('Could not update DukaMall listing');
+                              }
+                            }}
+                            className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full ${
+                              product.listed_on_marketplace
+                                ? 'bg-emerald-50 text-emerald-700'
+                                : 'bg-gray-100 text-gray-500'
+                            }`}
+                            title={product.listed_on_marketplace ? 'Listed on DukaMall' : 'Not listed on DukaMall'}
+                          >
+                            <FaStore /> {product.listed_on_marketplace ? 'Listed' : 'Hidden'}
+                          </button>
+                        ) : (
+                          <span className="text-xs text-gray-400">{product.listed_on_marketplace ? 'Listed' : 'Hidden'}</span>
+                        )}
                       </td>
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-1">
@@ -382,14 +442,14 @@ const ProductsPage = () => {
             </p>
             <label className="label-primary">Hero badge text</label>
             <input
-              className="input-primary mb-3"
+              className="input-primary mb-3 bg-white text-gray-800"
               value={featureBadge}
               onChange={(e) => setFeatureBadge(e.target.value)}
               placeholder="Save 30%"
             />
             <label className="label-primary">M-Pesa phone</label>
             <input
-              className="input-primary mb-4"
+              className="input-primary mb-4 bg-white text-gray-800"
               value={featurePhone}
               onChange={(e) => setFeaturePhone(e.target.value)}
               placeholder="07XXXXXXXX"

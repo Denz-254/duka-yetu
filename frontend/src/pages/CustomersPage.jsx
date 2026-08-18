@@ -275,19 +275,19 @@ const CustomersPage = () => {
               ].map(([key, label, type]) => (
                 <div key={key} className={key === 'address' ? 'sm:col-span-2' : ''}>
                   <label className="label-primary">{label}</label>
-                  <input type={type} value={formData[key]} onChange={(e) => setFormData({ ...formData, [key]: e.target.value })} className="input-primary" required={key === 'name'} />
+                  <input type={type} value={formData[key]} onChange={(e) => setFormData({ ...formData, [key]: e.target.value })} className="input-primary bg-white text-gray-800" required={key === 'name'} />
                 </div>
               ))}
               <div>
                 <label className="label-primary">Status</label>
-                <select value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })} className="input-primary">
+                <select value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })} className="input-primary bg-white text-gray-800">
                   <option value="active">Active</option>
                   <option value="inactive">Inactive</option>
                 </select>
               </div>
               <div className="sm:col-span-2">
                 <label className="label-primary">Notes</label>
-                <textarea value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} className="input-primary" rows="3" />
+                <textarea value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} className="input-primary bg-white text-gray-800" rows="3" />
               </div>
               <div className="sm:col-span-2 flex gap-3">
                 <button disabled={loading} className="btn-primary flex-1">{loading ? 'Saving...' : 'Save Customer'}</button>

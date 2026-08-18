@@ -14,6 +14,7 @@ export const products = {
   lowStock: () => api.get('/products/alerts/low-stock'),
   feature: (id, data) => api.post(`/products/${id}/feature`, data, { timeout: 45000 }),
   featureStatus: (id, paymentId) => api.get(`/products/${id}/feature-status/${paymentId}`),
+  marketplaceListing: (product_ids, listed) => api.post('/products/marketplace-listing', { product_ids, listed }),
 };
 
 export const sales = {
@@ -26,6 +27,7 @@ export const sales = {
 export const payments = {
   mpesaStkPush: (data) => api.post('/payments/mpesa/stk-push', data, { timeout: 45000 }),
   mpesaStatus: (paymentId) => api.get(`/payments/mpesa/${paymentId}`, { timeout: 15000 }),
+  mpesaMode: () => api.get('/payments/mpesa/mode'),
 };
 
 export const dashboard = {

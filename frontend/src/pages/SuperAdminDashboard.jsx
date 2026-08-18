@@ -7,7 +7,7 @@ import {
 import { toast } from 'react-hot-toast';
 import api from '../api/client';
 import useAuthStore from '../store/authStore';
-import { formatCurrency, formatDate } from '../utils/helpers';
+import { formatCurrency, formatDate, downloadBlob } from '../utils/helpers';
 import Modal from '../components/common/Modal';
 
 const SuperAdminDashboard = () => {
@@ -157,6 +157,19 @@ const SuperAdminDashboard = () => {
     }
   };
 
+  const changePlan = async (bizId, packageName, subscriptionStatus) => {
+    try {
+      await api.post(`/admin/businesses/${bizId}/plan`, {
+        package: packageName,
+        subscription_status: subscriptionStatus,
+      });
+      toast.success('Plan updated');
+      load();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Plan update failed');
+    }
+  };
+
   const approve = async (id) => {
     try {
       await api.post(`/admin/businesses/${id}/approve`);
@@ -186,12 +199,7 @@ const SuperAdminDashboard = () => {
         params: { billing_cycle: 'monthly' },
         responseType: 'blob',
       });
-      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'text/html' }));
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `invoice-${(bizName || 'business').replace(/\s+/g, '-')}.html`;
-      a.click();
-      window.URL.revokeObjectURL(url);
+      downloadBlob(res.data, `invoice-${(bizName || 'business').replace(/\s+/g, '-')}.pdf`);
       toast.success('Invoice downloaded — send to the business');
     } catch {
       toast.error('Invoice failed');
@@ -263,7 +271,29 @@ const SuperAdminDashboard = () => {
                 {(analyticsBiz.length ? analyticsBiz : businesses).slice(0, 50).map((biz) => (
                   <tr key={biz.id}>
                     <td>{biz.name}</td>
-                    <td>{biz.package}</td>
+                    <td>
+                      <div className="flex flex-col gap-2">
+                        <select
+                          className="input-primary"
+                          value={biz.package || 'BASIC'}
+                          onChange={(e) => changePlan(biz.id, e.target.value, biz.subscription_status || 'ACTIVE')}
+                        >
+                          <option value="BASIC">BASIC</option>
+                          <option value="PROFESSIONAL">PROFESSIONAL</option>
+                          <option value="ENTERPRISE">ENTERPRISE</option>
+                        </select>
+                        <select
+                          className="input-primary"
+                          value={biz.subscription_status || 'TRIALING'}
+                          onChange={(e) => changePlan(biz.id, biz.package || 'BASIC', e.target.value)}
+                        >
+                          <option value="TRIALING">Trial</option>
+                          <option value="ACTIVE">Active</option>
+                          <option value="PAST_DUE">Past due</option>
+                          <option value="CANCELED">Canceled</option>
+                        </select>
+                      </div>
+                    </td>
                     <td>{formatCurrency(biz.sales_revenue || 0)} <span>({biz.sales_count || 0})</span></td>
                     <td>{formatCurrency(biz.online_revenue || 0)}</td>
                     <td className="admin-table__green">{formatCurrency(biz.platform_commission || 0)}</td>
@@ -446,9 +476,30 @@ const SuperAdminDashboard = () => {
                     <p className="admin-approval-name">{biz.name}</p>
                     <p className="admin-approval-meta">{biz.owner_name} · {biz.email} · {biz.phone}</p>
                     <p className="admin-approval-meta admin-approval-meta--small">
-                      Registered {formatDate(biz.created_at)} · {biz.package} · {biz.products_count} products
+                      Registered {formatDate(biz.created_at)} · {biz.package} · {biz.subscription_status} · {biz.products_count} products
                       {biz.sales_revenue != null && ` · POS ${formatCurrency(biz.sales_revenue)}`}
                     </p>
+                    <div className="flex gap-2 mt-2">
+                      <select
+                        className="input-primary"
+                        value={biz.package || 'BASIC'}
+                        onChange={(e) => changePlan(biz.id, e.target.value, biz.subscription_status || 'ACTIVE')}
+                      >
+                        <option value="BASIC">BASIC</option>
+                        <option value="PROFESSIONAL">PROFESSIONAL</option>
+                        <option value="ENTERPRISE">ENTERPRISE</option>
+                      </select>
+                      <select
+                        className="input-primary"
+                        value={biz.subscription_status || 'TRIALING'}
+                        onChange={(e) => changePlan(biz.id, biz.package || 'BASIC', e.target.value)}
+                      >
+                        <option value="TRIALING">Trial</option>
+                        <option value="ACTIVE">Active</option>
+                        <option value="PAST_DUE">Past due</option>
+                        <option value="CANCELED">Canceled</option>
+                      </select>
+                    </div>
                   </div>
                   <div className="admin-approval-actions">
                     <span className={`admin-status ${biz.approval_status === 'APPROVED' ? 'approved' : biz.approval_status === 'REJECTED' ? 'rejected' : 'pending'}`}>{biz.approval_status}</span>
@@ -481,7 +532,7 @@ const SuperAdminDashboard = () => {
       >
         <p className="mb-3">Optional reason sent for your records:</p>
         <textarea
-          className="input-primary w-full"
+          className="input-primary w-full bg-white text-gray-800"
           rows={3}
           value={rejectReason}
           onChange={(e) => setRejectReason(e.target.value)}

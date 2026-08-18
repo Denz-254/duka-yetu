@@ -18,6 +18,7 @@ import {
 import { toast } from 'react-hot-toast';
 import api from '../api/client';
 import useMarketCartStore from '../store/marketCartStore';
+import ProductCard from '../components/products/ProductCard';
 import { formatCurrency } from '../utils/helpers';
 
 const categoryFallbacks = {
@@ -43,6 +44,8 @@ const MarketplacePage = () => {
   const [dealOfTheDay, setDealOfTheDay] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [showAllProducts, setShowAllProducts] = useState(false);
+  const [dealCountdown, setDealCountdown] = useState({ h: '00', m: '00', s: '00' });
   const [heroIndex, setHeroIndex] = useState(0);
   const addItem = useMarketCartStore((state) => state.addItem);
   const cartCount = useMarketCartStore((state) => state.items.length);
@@ -68,7 +71,7 @@ const MarketplacePage = () => {
         const [categoriesRes, featuredRes, productsRes, dealRes] = await Promise.all([
           api.get('/marketplace/categories'),
           api.get('/marketplace/featured', { params: { limit: 6 } }),
-          api.get('/marketplace/products', { params: { limit: 24 } }),
+          api.get('/marketplace/products', { params: { limit: 200 } }),
           api.get('/marketplace/deal-of-the-day').catch(() => ({ data: null })),
         ]);
 
@@ -86,6 +89,29 @@ const MarketplacePage = () => {
     fetchMarketplaceData();
   }, []);
 
+  useEffect(() => {
+    if (!dealOfTheDay?.deal_of_day_until) {
+      setDealCountdown({ h: '00', m: '00', s: '00' });
+      return undefined;
+    }
+    const tick = () => {
+      const remaining = new Date(dealOfTheDay.deal_of_day_until).getTime() - Date.now();
+      if (remaining <= 0) {
+        setDealCountdown({ h: '00', m: '00', s: '00' });
+        return;
+      }
+      const total = Math.floor(remaining / 1000);
+      setDealCountdown({
+        h: String(Math.floor(total / 3600)).padStart(2, '0'),
+        m: String(Math.floor((total % 3600) / 60)).padStart(2, '0'),
+        s: String(total % 60).padStart(2, '0'),
+      });
+    };
+    tick();
+    const timer = window.setInterval(tick, 1000);
+    return () => window.clearInterval(timer);
+  }, [dealOfTheDay]);
+
   const handleAddToCart = (product) => {
     addItem(product, 1);
     toast.success(`${product.name} added to cart`);
@@ -102,19 +128,12 @@ const MarketplacePage = () => {
     Default: categoryFallbacks.default,
   };
 
-  const categoryCards = categories.length
-    ? categories.map((category) => ({
-        title: category.name,
-        subtitle: 'Shop Now',
-        image: categoryImageMap[category.name] || categoryImageMap.Default,
-      }))
-    : [
-        { title: 'Fashion', subtitle: 'Shop Now', image: categoryImageMap.Fashion },
-        { title: 'Home', subtitle: 'Shop Now', image: categoryImageMap.Home },
-        { title: 'Beauty', subtitle: 'Shop Now', image: categoryImageMap.Beauty },
-        { title: 'Electronics', subtitle: 'Shop Now', image: categoryImageMap.Electronics },
-        { title: 'Lifestyle', subtitle: 'Shop Now', image: categoryImageMap.Lifestyle },
-      ];
+  const categoryCards = categories.map((category) => ({
+    id: category.id,
+    title: category.name,
+    subtitle: `${category.product_count || 0} items`,
+    image: categoryImageMap[category.name] || categoryImageMap.Default,
+  }));
 
   const featuredActive = heroSlides[heroIndex] || heroSlides[0] || null;
 
@@ -251,14 +270,16 @@ const MarketplacePage = () => {
             <button type="button" className={`category-filters ${selectedCategory === 'all' ? 'is-active' : ''}`} onClick={() => setSelectedCategory('all')}>
               All Products
             </button>
+            {loading && !categoryCards.length && <div className="loading-box">Loading categories...</div>}
+            {!loading && !categoryCards.length && <div className="loading-box">No categories listed on DukaMall yet.</div>}
             {categoryCards.map((card) => (
-              <article key={card.title} className="category-card">
+              <article key={card.id} className={`category-card ${selectedCategory === card.id ? 'is-active' : ''}`}>
                 <div className="category-image-wrap">
                   <img src={card.image} alt={card.title} />
                 </div>
                 <div className="category-card__meta">
                   <span>{card.title}</span>
-                  <button type="button" onClick={() => setSelectedCategory(categories.find((category) => category.name === card.title)?.id || 'all')}>
+                  <button type="button" onClick={() => setSelectedCategory(card.id)}>
                     {card.subtitle} <FaArrowRight />
                   </button>
                 </div>
@@ -271,42 +292,46 @@ const MarketplacePage = () => {
           <div className="deal-copy">
             <p className="deal-label">DEAL OF THE DAY</p>
             <h3>
-              Grab It Before
-              <span>It’s Gone!</span>
+              {dealOfTheDay ? dealOfTheDay.name : 'Today’s pick'}
+              <span>{dealOfTheDay ? 'Limited time' : 'Set from admin'}</span>
             </h3>
-            <p className="deal-sub">Premium offers from verified Kenyan sellers.</p>
-            <button type="button" className="deal-button" onClick={() => setSelectedCategory('all')}>SHOP THE DEAL <FaArrowRight /></button>
+            <p className="deal-sub">
+              {dealOfTheDay
+                ? (dealOfTheDay.description || `From ${dealOfTheDay.business_name}`)
+                : 'The daily deal appears here once a product is selected in Super Admin.'}
+            </p>
+            {dealOfTheDay ? (
+              <button type="button" className="deal-button" onClick={() => handleAddToCart(dealOfTheDay)}>
+                ADD TO CART <FaArrowRight />
+              </button>
+            ) : (
+              <button type="button" className="deal-button" onClick={() => setSelectedCategory('all')}>
+                BROWSE PRODUCTS <FaArrowRight />
+              </button>
+            )}
           </div>
 
           <div className="watch-display">
             <div className="watch-header">
-              <span>{dealOfTheDay?.name || featuredProducts[1]?.name || 'Smart Watch Pro'}</span>
-              <span className="watch-chip">Trending now</span>
+              <span>{dealOfTheDay?.name || 'No deal yet'}</span>
+              <span className="watch-chip">{dealOfTheDay ? 'Live deal' : 'Waiting'}</span>
             </div>
-
-            <div className="watch-card">
-              <div className="watch-case">
-                <div className="watch-face">
-                  <div className="watch-face__inner">
-                    <div className="watch-ring ring-1" />
-                    <div className="watch-ring ring-2" />
-                    <div className="watch-ring ring-3" />
-                  </div>
-                </div>
-              </div>
-            </div>
-
+            {dealOfTheDay?.image_url ? (
+              <img className="deal-product-image" src={dealOfTheDay.image_url} alt={dealOfTheDay.name} />
+            ) : (
+              <div className="deal-product-image" />
+            )}
             <div className="watch-price-row">
-              <strong>{formatCurrency(dealOfTheDay?.selling_price || featuredProducts[1]?.selling_price || 5999)}</strong>
-              <span>{formatCurrency((dealOfTheDay?.selling_price || featuredProducts[1]?.selling_price || 5999) * 1.8)}</span>
+              <strong>{dealOfTheDay ? formatCurrency(dealOfTheDay.selling_price) : '—'}</strong>
+              {dealOfTheDay?.business_name && <span>{dealOfTheDay.business_name}</span>}
             </div>
-            <p className="watch-note">Only limited stock left!</p>
-
+            <p className="watch-note">
+              {dealOfTheDay ? `${dealOfTheDay.stock_quantity} left in stock` : 'Check back soon'}
+            </p>
             <div className="countdown-row">
-              <div><span>08</span><small>HRS</small></div>
-              <div><span>12</span><small>MINS</small></div>
-              <div><span>45</span><small>SECS</small></div>
-              <div><span>30</span><small>MSEC</small></div>
+              <div><span>{dealCountdown.h}</span><small>HRS</small></div>
+              <div><span>{dealCountdown.m}</span><small>MINS</small></div>
+              <div><span>{dealCountdown.s}</span><small>SECS</small></div>
             </div>
           </div>
         </section>
@@ -314,34 +339,30 @@ const MarketplacePage = () => {
         <section className="new-arrivals">
           <div className="section-header">
             <h2>New Arrivals</h2>
-            <button type="button" className="view-all-link" onClick={() => setSelectedCategory('all')}>View All <FaArrowRight /></button>
+            <button
+              type="button"
+              className="view-all-link"
+              onClick={() => {
+                setSelectedCategory('all');
+                setShowAllProducts(true);
+              }}
+            >
+              View All <FaArrowRight />
+            </button>
           </div>
 
           <div className="arrival-grid">
             {loading ? (
               <div className="loading-box">Loading products...</div>
             ) : visibleProducts.length ? (
-              visibleProducts.slice(0, 8).map((item) => (
-                <article key={item.id} className="arrival-card">
-                  <div className="arrival-card__top">
-                    <span className="arrival-badge">{item.is_featured ? (item.featured_badge || 'Featured') : 'NEW'}</span>
-                    <button type="button" className="wishlist-btn" aria-label="Add to wishlist">
-                      <FaHeart />
-                    </button>
-                  </div>
-                  <Link to={`/shop/product/${item.id}`} className="arrival-image-wrap">
-                    <img src={item.image_url || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=900&q=80'} alt={item.name} />
-                  </Link>
-                  <div className="arrival-card__meta">
-                    <Link to={`/shop/product/${item.id}`}><h4>{item.name}</h4></Link>
-                    <div className="price-row">
-                      <span>{formatCurrency(item.selling_price)}</span>
-                      <button type="button" className="cart-mini" aria-label="Add to cart" onClick={() => handleAddToCart(item)}>
-                        <FaShoppingCart />
-                      </button>
-                    </div>
-                  </div>
-                </article>
+              (showAllProducts ? visibleProducts : visibleProducts.slice(0, 8)).map((item) => (
+                <ProductCard
+                  key={item.id}
+                  product={item}
+                  href={`/shop/product/${item.id}`}
+                  onAdd={handleAddToCart}
+                  showWishlist
+                />
               ))
             ) : (
               <div className="loading-box">No products found in this category.</div>

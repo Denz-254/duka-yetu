@@ -50,6 +50,8 @@ class MarketProduct(BaseModel):
     category_name: Optional[str] = None
     is_featured: bool = False
     featured_badge: Optional[str] = None
+    is_deal_of_day: bool = False
+    deal_of_day_until: Optional[datetime] = None
 
 
 class MarketProductList(BaseModel):
@@ -64,9 +66,23 @@ class MarketCategory(BaseModel):
     product_count: int = 0
 
 
+def _marketplace_visible(query):
+    return query.filter(
+        Product.is_active == True,  # noqa: E712
+        Product.listed_on_marketplace == True,  # noqa: E712
+        Product.stock_quantity > 0,
+        Business.is_active == True,  # noqa: E712
+        Business.approval_status == "APPROVED",
+    )
+
+
 def _to_market_product(product: Product, business: Business) -> MarketProduct:
+    now = datetime.utcnow()
     featured_active = bool(product.is_featured) and (
-        not product.featured_until or product.featured_until >= datetime.utcnow()
+        not product.featured_until or product.featured_until >= now
+    )
+    deal_active = bool(getattr(product, "is_deal_of_day", False)) and (
+        not product.deal_of_day_until or product.deal_of_day_until >= now
     )
     return MarketProduct(
         id=str(product.id),
@@ -76,12 +92,14 @@ def _to_market_product(product: Product, business: Business) -> MarketProduct:
         selling_price=product.selling_price,
         stock_quantity=product.stock_quantity,
         image_url=product.image_url,
-        business_id=str(business.id),
-        business_name=business.name,
+        business_id=str(business.id) if business else "",
+        business_name=business.name if business else "",
         category_id=str(product.category_id) if product.category_id else None,
         category_name=product.category.name if product.category else None,
         is_featured=featured_active,
         featured_badge=product.featured_badge if featured_active else None,
+        is_deal_of_day=deal_active,
+        deal_of_day_until=product.deal_of_day_until if deal_active else None,
     )
 
 
@@ -95,6 +113,7 @@ def list_marketplace_categories(db: Session = Depends(get_db)):
         .filter(
             Category.is_active == True,  # noqa: E712
             Product.is_active == True,  # noqa: E712
+            Product.listed_on_marketplace == True,  # noqa: E712
             Product.stock_quantity > 0,
             Business.approval_status == "APPROVED",
             Business.is_active == True,  # noqa: E712
@@ -111,8 +130,10 @@ def list_marketplace_categories(db: Session = Depends(get_db)):
             .filter(
                 Product.category_id == cat.id,
                 Product.is_active == True,  # noqa: E712
+                Product.listed_on_marketplace == True,  # noqa: E712
                 Product.stock_quantity > 0,
                 Business.approval_status == "APPROVED",
+                Business.is_active == True,  # noqa: E712
             )
             .count()
         )
@@ -135,18 +156,11 @@ def list_marketplace_products(
     min_price: Optional[float] = Query(None, ge=0),
     max_price: Optional[float] = Query(None, ge=0),
     skip: int = Query(0, ge=0),
-    limit: int = Query(24, ge=1, le=100),
+    limit: int = Query(24, ge=1, le=200),
 ):
     """Public catalog of products from approved businesses."""
-    query = (
-        db.query(Product, Business)
-        .join(Business, Business.id == Product.business_id)
-        .filter(
-            Product.is_active == True,  # noqa: E712
-            Product.stock_quantity > 0,
-            Business.is_active == True,  # noqa: E712
-            Business.approval_status == "APPROVED",
-        )
+    query = _marketplace_visible(
+        db.query(Product, Business).join(Business, Business.id == Product.business_id)
     )
     if q:
         like = f"%{q.strip()}%"
@@ -176,6 +190,7 @@ def list_featured_products(
         .join(Business, Business.id == Product.business_id)
         .filter(
             Product.is_active == True,  # noqa: E712
+            Product.listed_on_marketplace == True,  # noqa: E712
             Product.stock_quantity > 0,
             Product.is_featured == True,  # noqa: E712
             Business.is_active == True,  # noqa: E712
@@ -230,6 +245,7 @@ def get_marketplace_product(product_id: UUID, db: Session = Depends(get_db)):
         .filter(
             Product.id == product_id,
             Product.is_active == True,  # noqa: E712
+            Product.listed_on_marketplace == True,  # noqa: E712
             Business.approval_status == "APPROVED",
             Business.is_active == True,  # noqa: E712
         )
@@ -253,7 +269,7 @@ async def marketplace_checkout(payload: MarketplaceCheckoutRequest, db: Session 
             Product.id == item.product_id,
             Product.is_active == True,  # noqa: E712
         ).first()
-        if not product:
+        if not product or not product.listed_on_marketplace:
             raise HTTPException(status_code=404, detail=f"Product {item.product_id} not found")
         business = db.query(Business).filter(
             Business.id == product.business_id,
@@ -395,10 +411,8 @@ def get_public_order_status(order_id: UUID, db: Session = Depends(get_db)):
 
 @router.get("/orders/{order_id}/invoice")
 def download_order_invoice(order_id: UUID, db: Session = Depends(get_db)):
-    """Generate downloadable HTML invoice for a paid M-Pesa marketplace order."""
-    from fastapi.responses import HTMLResponse
-
-    from app.utils.invoice_generator import generate_order_invoice_html
+    """Generate a downloadable PDF invoice for a paid M-Pesa marketplace order."""
+    from app.utils.invoice_generator import generate_order_invoice_pdf, pdf_attachment
 
     order = db.query(OnlineOrder).filter(OnlineOrder.id == order_id).first()
     if not order:
@@ -406,40 +420,28 @@ def download_order_invoice(order_id: UUID, db: Session = Depends(get_db)):
     if order.payment_status != "PAID":
         raise HTTPException(status_code=400, detail="Invoice available after payment")
     business = db.query(Business).filter(Business.id == order.business_id).first()
-    html = generate_order_invoice_html(order, business)
-    return HTMLResponse(
-        content=html,
-        headers={
-            "Content-Disposition": f'attachment; filename="invoice-{order.order_number}.html"'
-        },
+    return pdf_attachment(
+        generate_order_invoice_pdf(order, business),
+        f"invoice-{order.order_number}.pdf",
     )
 
 
 @router.get("/deal-of-the-day", response_model=Optional[MarketProduct])
 def get_deal_of_the_day(db: Session = Depends(get_db)):
-    """Get the current deal of the day product if set by admin."""
-    product = db.query(Product).filter(
-        Product.is_deal_of_day == True,
-        or_(Product.deal_of_day_until == None, Product.deal_of_day_until > datetime.utcnow())
-    ).first()
-    
-    if not product:
-        return None
-    
-    business = db.query(Business).filter(Business.id == product.business_id).first()
-    category = db.query(Category).filter(Category.id == product.category_id).first() if product.category_id else None
-    
-    return MarketProduct(
-        id=str(product.id),
-        name=product.name,
-        description=product.description,
-        sku=product.sku,
-        selling_price=Decimal(str(product.selling_price)),
-        stock_quantity=product.stock_quantity,
-        image_url=product.image_url,
-        business_id=str(business.id) if business else None,
-        business_name=business.name if business else None,
-        category_id=str(product.category_id) if product.category_id else None,
-        category_name=category.name if category else None,
-        is_featured=product.is_featured,
+    """Public deal of the day from an approved seller listed on DukaMall."""
+    now = datetime.utcnow()
+    row = (
+        _marketplace_visible(
+            db.query(Product, Business).join(Business, Business.id == Product.business_id)
+        )
+        .filter(
+            Product.is_deal_of_day == True,  # noqa: E712
+            or_(Product.deal_of_day_until == None, Product.deal_of_day_until >= now),  # noqa: E711
+        )
+        .order_by(desc(Product.deal_of_day_until), desc(Product.updated_at))
+        .first()
     )
+    if not row:
+        return None
+    product, business = row
+    return _to_market_product(product, business)

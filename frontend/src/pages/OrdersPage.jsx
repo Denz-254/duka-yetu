@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { FaBoxOpen, FaSync } from 'react-icons/fa';
+import { FaBoxOpen, FaSync, FaDownload } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
 import api from '../api/client';
-import { formatCurrency, formatDate } from '../utils/helpers';
+import { formatCurrency, formatDate, downloadBlob } from '../utils/helpers';
 
 const OrdersPage = () => {
   const [orders, setOrders] = useState([]);
@@ -40,6 +40,15 @@ const OrdersPage = () => {
       load();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Update failed');
+    }
+  };
+
+  const downloadInvoice = async (order) => {
+    try {
+      const res = await api.get(`/orders/${order.id}/invoice`, { responseType: 'blob' });
+      downloadBlob(res.data, `invoice-${order.order_number}.pdf`);
+    } catch {
+      toast.error('Invoice download failed');
     }
   };
 
@@ -120,19 +129,26 @@ const OrdersPage = () => {
                     </div>
                   </div>
                 </div>
-                {order.payment_status === 'PAID' && order.fulfillment_status !== 'DELIVERED' && (
+                {order.payment_status === 'PAID' && (
                   <div className="flex gap-2">
-                    {order.fulfillment_status !== 'PROCESSING' && (
+                    <button onClick={() => downloadInvoice(order)} className="text-xs px-3 py-1.5 rounded bg-gray-900 text-white inline-flex items-center gap-1">
+                      <FaDownload /> Invoice PDF
+                    </button>
+                    {order.fulfillment_status !== 'DELIVERED' && order.fulfillment_status !== 'PROCESSING' && (
                       <button onClick={() => updateStatus(order.id, 'PROCESSING')} className="text-xs px-3 py-1.5 rounded bg-blue-600 text-white">
                         Mark Processing
                       </button>
                     )}
-                    <button onClick={() => updateStatus(order.id, 'DELIVERED')} className="text-xs px-3 py-1.5 rounded bg-emerald-600 text-white">
-                      Mark Delivered
-                    </button>
-                    <button onClick={() => updateStatus(order.id, 'CANCELLED')} className="text-xs px-3 py-1.5 rounded bg-red-600 text-white">
-                      Cancel
-                    </button>
+                    {order.fulfillment_status !== 'DELIVERED' && (
+                      <>
+                        <button onClick={() => updateStatus(order.id, 'DELIVERED')} className="text-xs px-3 py-1.5 rounded bg-emerald-600 text-white">
+                          Mark Delivered
+                        </button>
+                        <button onClick={() => updateStatus(order.id, 'CANCELLED')} className="text-xs px-3 py-1.5 rounded bg-red-600 text-white">
+                          Cancel
+                        </button>
+                      </>
+                    )}
                   </div>
                 )}
               </div>

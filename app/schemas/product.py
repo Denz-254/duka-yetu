@@ -16,7 +16,8 @@ class ProductBase(BaseModel):
     description: Optional[str] = Field(None, max_length=500)
     image_url: Optional[str] = Field(None, max_length=500)
     category_id: Optional[str] = None
-    
+    listed_on_marketplace: bool = False
+
     @validator('selling_price')
     def validate_selling_price(cls, v):
         if v <= 0:
@@ -54,6 +55,7 @@ class ProductUpdate(BaseModel):
     image_url: Optional[str] = Field(None, max_length=500)
     category_id: Optional[str] = None
     is_active: Optional[bool] = None
+    listed_on_marketplace: Optional[bool] = None
     
     @validator('selling_price')
     def validate_selling_price(cls, v):
@@ -88,6 +90,9 @@ class ProductResponse(ProductBase):
     is_featured: bool = False
     featured_until: Optional[datetime] = None
     featured_badge: Optional[str] = None
+    listed_on_marketplace: bool = False
+    is_deal_of_day: bool = False
+    deal_of_day_until: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
     

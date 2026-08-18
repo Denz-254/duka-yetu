@@ -63,6 +63,9 @@ def _product_response(product: Product) -> ProductResponse:
     data.is_featured = bool(getattr(product, "is_featured", False))
     data.featured_until = getattr(product, "featured_until", None)
     data.featured_badge = getattr(product, "featured_badge", None)
+    data.listed_on_marketplace = bool(getattr(product, "listed_on_marketplace", False))
+    data.is_deal_of_day = bool(getattr(product, "is_deal_of_day", False))
+    data.deal_of_day_until = getattr(product, "deal_of_day_until", None)
     return data
 
 
@@ -94,6 +97,7 @@ async def create_product(
         description=product_data.description,
         image_url=product_data.image_url,
         is_active=True,
+        listed_on_marketplace=bool(product_data.listed_on_marketplace),
     )
 
     db.add(product)
@@ -108,7 +112,7 @@ async def list_products(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     skip: int = Query(0, ge=0),
-    limit: int = Query(20, ge=1, le=100),
+    limit: int = Query(100, ge=1, le=200),
     search: Optional[str] = Query(None, min_length=1),
     category_id: Optional[str] = Query(None),
 ):
@@ -153,6 +157,52 @@ async def get_low_stock_products(
         Product.stock_quantity < threshold
     ).all()
     return [_product_response(p) for p in products]
+
+
+class MarketplaceListingRequest(BaseModel):
+    product_ids: list[str] = Field(..., min_length=1)
+    listed: bool = True
+
+
+@router.post("/marketplace-listing", response_model=ProductListResponse)
+async def bulk_marketplace_listing(
+    payload: MarketplaceListingRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_owner),
+):
+    """Owner selects which inventory items appear on DukaMall."""
+    ids = []
+    for value in payload.product_ids:
+        try:
+            ids.append(UUID(str(value)))
+        except ValueError:
+            continue
+    if not ids:
+        raise HTTPException(status_code=400, detail="Invalid product ids")
+    products = db.query(Product).filter(
+        Product.business_id == current_user.business_id,
+        Product.id.in_(ids),
+        Product.is_active == True,  # noqa: E712
+    ).all()
+    if not products:
+        raise HTTPException(status_code=404, detail="No matching products")
+    for product in products:
+        product.listed_on_marketplace = payload.listed
+        if not payload.listed:
+            product.is_deal_of_day = False
+            product.deal_of_day_until = None
+    db.commit()
+    refreshed = db.query(Product).filter(
+        Product.business_id == current_user.business_id,
+        Product.is_active == True,  # noqa: E712
+    ).all()
+    return ProductListResponse(
+        items=[_product_response(p) for p in refreshed],
+        total=len(refreshed),
+        page=1,
+        pages=1,
+        per_page=len(refreshed) or 1,
+    )
 
 
 @router.post("/{product_id}/feature", response_model=FeatureProductResponse, status_code=201)

@@ -403,7 +403,7 @@ const StaffPage = () => {
       >
         <input
           type="password"
-          className="input-primary w-full"
+          className="input-primary w-full bg-white text-gray-800"
           placeholder="New password (min 8)"
           value={newPassword}
           onChange={(e) => setNewPassword(e.target.value)}

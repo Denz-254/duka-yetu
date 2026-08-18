@@ -5,7 +5,6 @@ from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
@@ -16,7 +15,7 @@ from app.models.business import Business
 from app.models.online_order import Notification, OnlineOrder
 from app.models.user import User
 from app.services.email import send_order_delivered_emails
-from app.utils.invoice_generator import generate_order_invoice_html
+from app.utils.invoice_generator import generate_order_invoice_pdf, pdf_attachment
 
 router = APIRouter()
 
@@ -137,12 +136,9 @@ def business_order_invoice(
         raise HTTPException(status_code=404, detail="Order not found")
     if order.payment_status != "PAID":
         raise HTTPException(status_code=400, detail="Invoice available after payment")
-    html = generate_order_invoice_html(order, business)
-    return HTMLResponse(
-        content=html,
-        headers={
-            "Content-Disposition": f'attachment; filename="invoice-{order.order_number}.html"'
-        },
+    return pdf_attachment(
+        generate_order_invoice_pdf(order, business),
+        f"invoice-{order.order_number}.pdf",
     )
 
 

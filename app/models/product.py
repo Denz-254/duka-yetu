@@ -29,6 +29,7 @@ class Product(Base):
     featured_badge = Column(String(50), nullable=True)  # e.g. "Save 30%"
     is_deal_of_day = Column(Boolean, default=False, nullable=False)
     deal_of_day_until = Column(DateTime, nullable=True)
+    listed_on_marketplace = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     

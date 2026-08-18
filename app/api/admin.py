@@ -5,7 +5,6 @@ from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import desc, func, or_
 from sqlalchemy.orm import Session
@@ -13,12 +12,13 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.dependencies import require_super_admin
+from app.core.plans import PLAN_DEFINITIONS, normalize_plan
 from app.models.business import Business
 from app.models.online_order import Notification, OnlineOrder
 from app.models.product import Product
 from app.models.sale import Sale
 from app.models.user import User
-from app.utils.invoice_generator import generate_platform_subscription_invoice_html
+from app.utils.invoice_generator import generate_platform_subscription_invoice_pdf, pdf_attachment
 
 router = APIRouter()
 
@@ -317,6 +317,9 @@ class AdminProductItem(BaseModel):
     featured_badge: Optional[str] = None
     days_remaining: Optional[int] = None
     is_active: bool = True
+    listed_on_marketplace: bool = False
+    is_deal_of_day: bool = False
+    deal_of_day_until: Optional[datetime] = None
 
 
 def _days_remaining(until: Optional[datetime]) -> Optional[int]:
@@ -324,6 +327,27 @@ def _days_remaining(until: Optional[datetime]) -> Optional[int]:
         return None
     days = (until.date() - datetime.utcnow().date()).days
     return max(0, days)
+
+
+def _admin_product_item(product: Product, business: Business) -> AdminProductItem:
+    return AdminProductItem(
+        id=str(product.id),
+        name=product.name,
+        sku=product.sku,
+        selling_price=float(product.selling_price),
+        stock_quantity=product.stock_quantity,
+        image_url=product.image_url,
+        business_id=str(business.id),
+        business_name=business.name,
+        is_featured=bool(product.is_featured),
+        featured_until=product.featured_until,
+        featured_badge=product.featured_badge,
+        days_remaining=_days_remaining(product.featured_until) if product.is_featured else None,
+        is_active=bool(product.is_active),
+        listed_on_marketplace=bool(getattr(product, "listed_on_marketplace", False)),
+        is_deal_of_day=bool(getattr(product, "is_deal_of_day", False)),
+        deal_of_day_until=getattr(product, "deal_of_day_until", None),
+    )
 
 
 @router.get("/products", response_model=List[AdminProductItem])
@@ -358,24 +382,7 @@ def admin_list_products(
             )
         )
     rows = query.order_by(desc(Product.created_at)).limit(limit).all()
-    return [
-        AdminProductItem(
-            id=str(p.id),
-            name=p.name,
-            sku=p.sku,
-            selling_price=float(p.selling_price),
-            stock_quantity=p.stock_quantity,
-            image_url=p.image_url,
-            business_id=str(b.id),
-            business_name=b.name,
-            is_featured=bool(p.is_featured),
-            featured_until=p.featured_until,
-            featured_badge=p.featured_badge,
-            days_remaining=_days_remaining(p.featured_until) if p.is_featured else None,
-            is_active=bool(p.is_active),
-        )
-        for p, b in rows
-    ]
+    return [_admin_product_item(p, b) for p, b in rows]
 
 
 @router.get("/analytics")
@@ -445,17 +452,69 @@ def admin_subscription_invoice(
     now = datetime.utcnow()
     period_label = now.strftime("%B %Y") if billing_cycle == "monthly" else now.strftime("%Y")
     inv_no = f"SUB-{str(business.id)[:8].upper()}-{now.strftime('%Y%m')}"
-    html = generate_platform_subscription_invoice_html(
-        business,
-        plan=plan,
-        amount=amount,
-        billing_cycle=billing_cycle,
-        invoice_number=inv_no,
-        period_label=period_label,
+    return pdf_attachment(
+        generate_platform_subscription_invoice_pdf(
+            business,
+            plan=plan,
+            amount=amount,
+            billing_cycle=billing_cycle,
+            invoice_number=inv_no,
+            period_label=period_label,
+        ),
+        f"{inv_no}.pdf",
     )
-    return HTMLResponse(
-        content=html,
-        headers={"Content-Disposition": f'attachment; filename="{inv_no}.html"'},
+
+
+class PlanUpdateRequest(BaseModel):
+    package: str = Field(..., min_length=3, max_length=50)
+    subscription_status: Optional[str] = Field(None, max_length=50)
+
+
+@router.post("/businesses/{business_id}/plan", response_model=AdminBusinessItem)
+def admin_set_business_plan(
+    business_id: UUID,
+    payload: PlanUpdateRequest,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_super_admin),
+):
+    """Move a business onto another subscription plan or status."""
+    business = db.query(Business).filter(Business.id == business_id).first()
+    if not business:
+        raise HTTPException(status_code=404, detail="Business not found")
+    plan = normalize_plan(payload.package)
+    if plan not in PLAN_DEFINITIONS:
+        raise HTTPException(status_code=400, detail="Unknown plan")
+    status_value = (payload.subscription_status or business.subscription_status or "ACTIVE").upper()
+    allowed_status = {"TRIALING", "ACTIVE", "PAST_DUE", "CANCELED", "CANCELLED"}
+    if status_value not in allowed_status:
+        raise HTTPException(status_code=400, detail="Invalid subscription status")
+    if status_value == "CANCELLED":
+        status_value = "CANCELED"
+    business.package = plan
+    business.subscription_status = status_value
+    if status_value == "ACTIVE":
+        business.subscription_current_period_end = datetime.utcnow() + timedelta(days=30)
+        business.trial_ends_at = None
+        business.is_active = True
+    elif status_value == "CANCELED":
+        business.subscription_current_period_end = datetime.utcnow()
+    db.commit()
+    db.refresh(business)
+    return AdminBusinessItem(
+        id=str(business.id),
+        name=business.name,
+        owner_name=business.owner_name,
+        email=business.email,
+        phone=business.phone,
+        package=business.package,
+        subscription_status=business.subscription_status or "TRIALING",
+        approval_status=business.approval_status or "PENDING",
+        is_active=business.is_active,
+        rejection_reason=business.rejection_reason,
+        created_at=business.created_at,
+        approved_at=business.approved_at,
+        products_count=0,
+        sales_count=0,
     )
 
 
@@ -479,25 +538,12 @@ def admin_feature_product(
         raise HTTPException(status_code=400, detail="Business must be approved")
 
     product.is_featured = True
+    product.listed_on_marketplace = True
     product.featured_until = datetime.utcnow() + timedelta(days=payload.days or settings.FEATURE_PRODUCT_DAYS)
     product.featured_badge = (payload.badge_text or product.featured_badge or "Featured")[:50]
     db.commit()
     db.refresh(product)
-    return AdminProductItem(
-        id=str(product.id),
-        name=product.name,
-        sku=product.sku,
-        selling_price=float(product.selling_price),
-        stock_quantity=product.stock_quantity,
-        image_url=product.image_url,
-        business_id=str(business.id),
-        business_name=business.name,
-        is_featured=True,
-        featured_until=product.featured_until,
-        featured_badge=product.featured_badge,
-        days_remaining=_days_remaining(product.featured_until),
-        is_active=bool(product.is_active),
-    )
+    return _admin_product_item(product, business)
 
 
 @router.delete("/featured/{product_id}", status_code=204)
@@ -533,22 +579,7 @@ def admin_get_deal_of_day(
     business = db.query(Business).filter(Business.id == product.business_id).first()
     if not business:
         return None
-    
-    return AdminProductItem(
-        id=str(product.id),
-        name=product.name,
-        sku=product.sku,
-        selling_price=float(product.selling_price),
-        stock_quantity=product.stock_quantity,
-        image_url=product.image_url,
-        business_id=str(business.id),
-        business_name=business.name,
-        is_featured=product.is_featured,
-        featured_until=product.featured_until,
-        featured_badge=product.featured_badge,
-        days_remaining=_days_remaining(product.featured_until) if product.featured_until else None,
-        is_active=bool(product.is_active),
-    )
+    return _admin_product_item(product, business)
 
 
 @router.post("/deal-of-the-day/{product_id}", response_model=AdminProductItem)
@@ -580,24 +611,10 @@ def admin_set_deal_of_day(
     
     product.is_deal_of_day = True
     product.deal_of_day_until = deal_expires
+    product.listed_on_marketplace = True
     db.commit()
     db.refresh(product)
-    
-    return AdminProductItem(
-        id=str(product.id),
-        name=product.name,
-        sku=product.sku,
-        selling_price=float(product.selling_price),
-        stock_quantity=product.stock_quantity,
-        image_url=product.image_url,
-        business_id=str(business.id),
-        business_name=business.name,
-        is_featured=product.is_featured,
-        featured_until=product.featured_until,
-        featured_badge=product.featured_badge,
-        days_remaining=_days_remaining(product.featured_until) if product.featured_until else None,
-        is_active=bool(product.is_active),
-    )
+    return _admin_product_item(product, business)
 
 
 @router.delete("/deal-of-the-day", status_code=204)

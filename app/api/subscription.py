@@ -399,10 +399,8 @@ async def download_invoice(
     current_user: User = Depends(require_owner),
     business: Business = Depends(get_current_business),
 ):
-    """Download HTML invoice for an M-Pesa subscription payment."""
-    from fastapi.responses import HTMLResponse
-
-    from app.utils.invoice_generator import generate_subscription_invoice_html
+    """Download PDF invoice for an M-Pesa subscription payment."""
+    from app.utils.invoice_generator import generate_subscription_invoice_pdf, pdf_attachment
 
     payment = db.query(MpesaTransaction).filter(
         MpesaTransaction.id == payment_id,
@@ -412,12 +410,9 @@ async def download_invoice(
     ).first()
     if not payment:
         raise HTTPException(status_code=404, detail="Invoice not found")
-    html = generate_subscription_invoice_html(payment, business)
-    return HTMLResponse(
-        content=html,
-        headers={
-            "Content-Disposition": f'attachment; filename="invoice-{str(payment.id)[:8]}.html"'
-        },
+    return pdf_attachment(
+        generate_subscription_invoice_pdf(payment, business),
+        f"invoice-{str(payment.id)[:8]}.pdf",
     )
 
 

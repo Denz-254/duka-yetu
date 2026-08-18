@@ -11,6 +11,7 @@ const defaultSettings = {
   bank_enabled: false,
   mpesa_account_type: 'paybill',
   mpesa_shortcode: '174379',
+  mpesa_send_money_phone: '',
   mpesa_consumer_key: '',
   mpesa_consumer_secret: '',
   mpesa_passkey: '',
@@ -68,6 +69,7 @@ const PaymentSettingsPage = () => {
         bank_enabled: settings.bank_enabled,
         mpesa_account_type: settings.mpesa_account_type,
         mpesa_shortcode: settings.mpesa_shortcode,
+        mpesa_send_money_phone: settings.mpesa_send_money_phone,
         card_processor: settings.card_processor,
         stripe_publishable_key: settings.stripe_publishable_key,
         currency: settings.currency,
@@ -116,7 +118,7 @@ const PaymentSettingsPage = () => {
           <form onSubmit={unlock} className="space-y-3">
             <input
               type="password"
-              className="input-primary"
+              className="input-primary bg-white text-gray-800"
               placeholder="Your account password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -221,24 +223,46 @@ const PaymentSettingsPage = () => {
                   <select value={settings.mpesa_account_type} onChange={(e) => setSettings({ ...settings, mpesa_account_type: e.target.value })} className="input-primary bg-white text-gray-800">
                     <option value="paybill">Paybill</option>
                     <option value="till">Till Number</option>
+                    <option value="send_money">Send Money (personal number)</option>
                   </select>
                 </div>
-                <div>
-                  <label className="label-primary">{settings.mpesa_account_type === 'till' ? 'Till Number' : 'Paybill Number'}</label>
-                  <input type="text" value={settings.mpesa_shortcode} onChange={(e) => setSettings({ ...settings, mpesa_shortcode: e.target.value })} className="input-primary bg-white text-gray-800" required />
-                </div>
-                <div>
-                  <label className="label-primary">Consumer Key {settings.mpesa_consumer_key_set ? '(saved)' : ''}</label>
-                  <input type="password" value={settings.mpesa_consumer_key} onChange={(e) => setSettings({ ...settings, mpesa_consumer_key: e.target.value })} className="input-primary bg-white text-gray-800" autoComplete="off" />
-                </div>
-                <div>
-                  <label className="label-primary">Consumer Secret {settings.mpesa_consumer_secret_set ? '(saved)' : ''}</label>
-                  <input type="password" value={settings.mpesa_consumer_secret} onChange={(e) => setSettings({ ...settings, mpesa_consumer_secret: e.target.value })} className="input-primary bg-white text-gray-800" autoComplete="off" />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="label-primary">Passkey {settings.mpesa_passkey_set ? '(saved)' : ''}</label>
-                  <input type="password" value={settings.mpesa_passkey} onChange={(e) => setSettings({ ...settings, mpesa_passkey: e.target.value })} className="input-primary bg-white text-gray-800" autoComplete="off" />
-                </div>
+                {settings.mpesa_account_type === 'send_money' ? (
+                  <div>
+                    <label className="label-primary">M-Pesa phone (Send Money)</label>
+                    <input
+                      type="tel"
+                      value={settings.mpesa_send_money_phone}
+                      onChange={(e) => setSettings({ ...settings, mpesa_send_money_phone: e.target.value })}
+                      className="input-primary bg-white text-gray-800"
+                      placeholder="07XXXXXXXX"
+                      required
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      For shops without a till or paybill. POS cashiers confirm after the customer sends money to this number. Online DukaMall checkout still uses the platform STK and pays out to this phone.
+                    </p>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="label-primary">{settings.mpesa_account_type === 'till' ? 'Till Number' : 'Paybill Number'}</label>
+                    <input type="text" value={settings.mpesa_shortcode} onChange={(e) => setSettings({ ...settings, mpesa_shortcode: e.target.value })} className="input-primary bg-white text-gray-800" required />
+                  </div>
+                )}
+                {settings.mpesa_account_type !== 'send_money' && (
+                  <>
+                    <div>
+                      <label className="label-primary">Consumer Key {settings.mpesa_consumer_key_set ? '(saved)' : ''}</label>
+                      <input type="password" value={settings.mpesa_consumer_key} onChange={(e) => setSettings({ ...settings, mpesa_consumer_key: e.target.value })} className="input-primary bg-white text-gray-800" autoComplete="off" />
+                    </div>
+                    <div>
+                      <label className="label-primary">Consumer Secret {settings.mpesa_consumer_secret_set ? '(saved)' : ''}</label>
+                      <input type="password" value={settings.mpesa_consumer_secret} onChange={(e) => setSettings({ ...settings, mpesa_consumer_secret: e.target.value })} className="input-primary bg-white text-gray-800" autoComplete="off" />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="label-primary">Passkey {settings.mpesa_passkey_set ? '(saved)' : ''}</label>
+                      <input type="password" value={settings.mpesa_passkey} onChange={(e) => setSettings({ ...settings, mpesa_passkey: e.target.value })} className="input-primary bg-white text-gray-800" autoComplete="off" />
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           )}

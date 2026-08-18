@@ -2,6 +2,15 @@ export const formatCurrency = (amount) => {
   return `KES ${Number(amount).toFixed(2)}`;
 };
 
+export const downloadBlob = (data, filename, mime = 'application/pdf') => {
+  const url = window.URL.createObjectURL(new Blob([data], { type: mime }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  window.URL.revokeObjectURL(url);
+};
+
 export const formatDate = (date) => {
   if (!date) return 'Never';
   return new Date(date).toLocaleDateString('en-KE', {

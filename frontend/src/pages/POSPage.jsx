@@ -12,6 +12,7 @@ import useAuthStore from '../store/authStore';
 import api from '../api/client';
 import { payments } from '../api/endpoints';
 import { formatCurrency } from '../utils/helpers';
+import ProductCard from '../components/products/ProductCard';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -24,6 +25,7 @@ const POSPage = () => {
   const [paymentMethod, setPaymentMethod] = useState('CASH');
   const [mpesaPhone, setMpesaPhone] = useState('');
   const [mpesaStatus, setMpesaStatus] = useState('');
+  const [mpesaMode, setMpesaMode] = useState({ account_type: 'paybill', send_money_phone: '', stk_available: true });
   const { items, total, addItem, removeItem, updateQuantity, clearCart } = useCartStore();
   const user = useAuthStore((state) => state.user);
 
@@ -40,12 +42,15 @@ const POSPage = () => {
 
   useEffect(() => {
     fetchProducts();
+    payments.mpesaMode()
+      .then(({ data }) => setMpesaMode(data || {}))
+      .catch(() => {});
   }, []);
 
   const fetchProducts = async () => {
     setLoading(true);
     try {
-      const response = await api.get('/products/');
+      const response = await api.get('/products/', { params: { limit: 100 } });
       setProducts(response.data.items || []);
     } catch (error) {
       toast.error('Failed to load products');
@@ -87,6 +92,11 @@ const POSPage = () => {
         toast.error('Enter the customer M-Pesa phone number');
         return;
       }
+    }
+
+    if (paymentMethod === 'SEND_MONEY' && !mpesaMode.send_money_phone) {
+      toast.error('Set a Send Money number in Payment Settings');
+      return;
     }
 
     setLoading(true);
@@ -136,7 +146,9 @@ const POSPage = () => {
 
   const paymentMethods = [
     { value: 'CASH', icon: FaMoneyBillWave, label: 'Cash' },
-    { value: 'MPESA', icon: FaMobileAlt, label: 'M-Pesa' },
+    mpesaMode.account_type === 'send_money'
+      ? { value: 'SEND_MONEY', icon: FaMobileAlt, label: 'Send Money' }
+      : { value: 'MPESA', icon: FaMobileAlt, label: 'M-Pesa' },
     { value: 'CARD', icon: FaCreditCard, label: 'Card' },
   ];
 
@@ -183,47 +195,17 @@ const POSPage = () => {
                 <div className="text-gray-400">Loading products...</div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-4 max-h-[550px] overflow-y-auto p-1">
+              <div className="pos-product-grid">
                 {filteredProducts.map((product) => (
-                  <motion.div
+                  <ProductCard
                     key={product.id}
-                    whileHover={{ y: -2 }}
-                    className={`max-w-full overflow-hidden bg-white rounded-lg shadow-lg border border-gray-100 ${
-                      product.stock_quantity <= 0 ? 'opacity-60' : ''
-                    }`}
-                  >
-                    <div className="px-4 py-3">
-                      <h3 className="text-xl font-bold text-gray-800 uppercase line-clamp-1">{product.name}</h3>
-                      <p className="mt-1 text-sm text-gray-600 line-clamp-2">
-                        {product.description || product.sku}
-                      </p>
-                    </div>
-                    {product.image_url ? (
-                      <img
-                        className="object-cover w-full h-48 mt-2"
-                        src={product.image_url}
-                        alt={product.name}
-                      />
-                    ) : (
-                      <div className="w-full h-48 mt-2 bg-primary-50 flex items-center justify-center text-primary-300">
-                        <FaBarcode className="text-4xl" />
-                      </div>
-                    )}
-                    <div className="flex items-center justify-between px-4 py-2 bg-gray-900">
-                      <h4 className="text-lg font-bold text-white">{formatCurrency(product.selling_price)}</h4>
-                      <button
-                        type="button"
-                        disabled={product.stock_quantity <= 0}
-                        onClick={() => {
-                          addItem(product);
-                          toast.success(`${product.name} added`);
-                        }}
-                        className="px-2 py-1 text-xs font-semibold text-gray-900 uppercase transition-colors duration-300 transform bg-white rounded hover:bg-gray-200 disabled:bg-gray-300 disabled:text-gray-500 focus:outline-none"
-                      >
-                        {product.stock_quantity > 0 ? 'Add to cart' : 'Out of stock'}
-                      </button>
-                    </div>
-                  </motion.div>
+                    product={product}
+                    compact
+                    onAdd={(item) => {
+                      addItem(item);
+                      toast.success(`${item.name} added`);
+                    }}
+                  />
                 ))}
               </div>
             )}
@@ -369,6 +351,16 @@ const POSPage = () => {
                   </div>
                 )}
 
+                {paymentMethod === 'SEND_MONEY' && (
+                  <div className="mt-4 p-3 rounded-lg border border-green-100 bg-green-50 space-y-2">
+                    <p className="text-sm font-medium text-gray-800">Ask the customer to send money to</p>
+                    <p className="text-lg font-bold text-green-800">{mpesaMode.send_money_phone || 'Not configured'}</p>
+                    <p className="text-xs text-gray-500">
+                      Confirm only after the M-Pesa SMS arrives. Total: {formatCurrency(total)}
+                    </p>
+                  </div>
+                )}
+
                 <div className="border-t border-gray-200 pt-4 mt-4">
                   <div className="flex justify-between text-lg font-bold">
                     <span>Total:</span>
@@ -388,7 +380,7 @@ const POSPage = () => {
                     ) : (
                       <>
                         <FaReceipt />
-                        {paymentMethod === 'MPESA' ? 'Pay with M-Pesa' : 'Complete Sale'}
+                        {paymentMethod === 'MPESA' ? 'Pay with M-Pesa' : paymentMethod === 'SEND_MONEY' ? 'Confirm Send Money' : 'Complete Sale'}
                       </>
                     )}
                   </button>

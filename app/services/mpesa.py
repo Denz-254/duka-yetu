@@ -48,9 +48,20 @@ def resolve_credentials(business_settings: dict) -> dict:
     passkey = (payment.get("mpesa_passkey") or settings.MPESA_PASSKEY or "").strip()
     shortcode = (payment.get("mpesa_shortcode") or settings.MPESA_SHORTCODE or "").strip()
     account_type = (payment.get("mpesa_account_type") or "paybill").strip().lower()
+    send_money_phone = (payment.get("mpesa_send_money_phone") or "").strip()
 
-    if account_type not in {"paybill", "till"}:
+    if account_type not in {"paybill", "till", "send_money"}:
         account_type = "paybill"
+
+    if account_type == "send_money":
+        if not send_money_phone:
+            raise MpesaError(
+                "Add your M-Pesa Send Money phone number in Payment Settings."
+            )
+        platform = resolve_platform_credentials()
+        platform["payout_phone"] = normalize_phone(send_money_phone)
+        platform["collection_mode"] = "send_money"
+        return platform
 
     missing = [
         name

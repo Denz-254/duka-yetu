@@ -23,7 +23,7 @@ export default function Modal({
             <FaTimes />
           </button>
         </div>
-        <div className="text-sm text-gray-600 mb-5">{children}</div>
+        <div className="text-sm text-gray-600 mb-5 space-y-3">{children}</div>
         {!hideActions && (
           <div className="flex justify-end gap-2">
             <button type="button" onClick={onClose} className="btn-secondary text-sm">

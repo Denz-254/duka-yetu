@@ -15,7 +15,7 @@ import { toast } from 'react-hot-toast';
 import api from '../api/client';
 import useMarketCartStore from '../store/marketCartStore';
 import useAuthStore from '../store/authStore';
-import { formatCurrency } from '../utils/helpers';
+import { formatCurrency, downloadBlob } from '../utils/helpers';
 import Seo from '../components/common/Seo';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -54,12 +54,7 @@ const MarketplaceCheckoutPage = () => {
       const res = await api.get(`/marketplace/orders/${orderResult.order_id}/invoice`, {
         responseType: 'blob',
       });
-      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'text/html' }));
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `invoice-${orderResult.order_number || 'order'}.html`;
-      a.click();
-      window.URL.revokeObjectURL(url);
+      downloadBlob(res.data, `invoice-${orderResult.order_number || 'order'}.pdf`);
     } catch {
       toast.error('Invoice download failed');
     }

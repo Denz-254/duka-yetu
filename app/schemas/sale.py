@@ -24,7 +24,7 @@ class SaleCreate(BaseModel):
     
     @validator('payment_method')
     def validate_payment_method(cls, v):
-        allowed = ["CASH", "MPESA", "CARD", "BANK"]
+        allowed = ["CASH", "MPESA", "CARD", "BANK", "SEND_MONEY"]
         if v.upper() not in allowed:
             raise ValueError(f'Payment method must be one of: {", ".join(allowed)}')
         return v.upper()

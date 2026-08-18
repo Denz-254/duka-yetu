@@ -319,7 +319,7 @@ def _merge_payment_settings(existing: dict, incoming: dict) -> dict:
             merged[key] = str(value).strip()
     if "mpesa_account_type" in merged:
         account_type = str(merged["mpesa_account_type"]).lower()
-        merged["mpesa_account_type"] = account_type if account_type in {"paybill", "till"} else "paybill"
+        merged["mpesa_account_type"] = account_type if account_type in {"paybill", "till", "send_money"} else "paybill"
     return merged
 
 
