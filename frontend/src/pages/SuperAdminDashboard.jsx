@@ -270,8 +270,8 @@ const SuperAdminDashboard = () => {
               <tbody>
                 {(analyticsBiz.length ? analyticsBiz : businesses).slice(0, 50).map((biz) => (
                   <tr key={biz.id}>
-                    <td>{biz.name}</td>
-                    <td>
+                    <td data-label="Business">{biz.name}</td>
+                    <td data-label="Plan">
                       <div className="flex flex-col gap-2">
                         <select
                           className="input-primary"
@@ -294,10 +294,10 @@ const SuperAdminDashboard = () => {
                         </select>
                       </div>
                     </td>
-                    <td>{formatCurrency(biz.sales_revenue || 0)} <span>({biz.sales_count || 0})</span></td>
-                    <td>{formatCurrency(biz.online_revenue || 0)}</td>
-                    <td className="admin-table__green">{formatCurrency(biz.platform_commission || 0)}</td>
-                    <td>
+                    <td data-label="POS Sales">{formatCurrency(biz.sales_revenue || 0)} <span>({biz.sales_count || 0})</span></td>
+                    <td data-label="Online">{formatCurrency(biz.online_revenue || 0)}</td>
+                    <td data-label="Platform Cut" className="admin-table__green">{formatCurrency(biz.platform_commission || 0)}</td>
+                    <td data-label="Invoice">
                       <button type="button" onClick={() => downloadInvoice(biz.id, biz.name)} className="admin-table__button">
                         <FaFileInvoice /> Sub invoice
                       </button>
