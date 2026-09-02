@@ -292,7 +292,7 @@ const ProductForm = ({ product, onSuccess, onCancel }) => {
         </span>
       </label>
 
-      <div className="flex gap-3 pt-2">
+      <div className="form-action-row flex flex-col gap-3 pt-2 sm:flex-row">
         <button
           type="submit"
           disabled={loading || uploading}
@@ -303,7 +303,7 @@ const ProductForm = ({ product, onSuccess, onCancel }) => {
         <button
           type="button"
           onClick={onCancel}
-          className="btn-secondary px-6 py-3 bg-white"
+          className="btn-secondary flex-1 px-6 py-3 bg-white"
         >
           Cancel
         </button>

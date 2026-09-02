@@ -79,10 +79,6 @@ const SuperAdminDashboard = () => {
     load();
   }, [filter]);
 
-  const scrollInputIntoView = (event) => {
-    event?.target?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
-  };
-
   const searchProducts = async (e) => {
     e?.preventDefault?.();
     if (!productQuery.trim()) {
@@ -325,7 +321,7 @@ const SuperAdminDashboard = () => {
             <form onSubmit={searchProducts} className="admin-search-form">
               <div className="admin-search-box">
                 <FaSearch />
-                <input value={productQuery} onChange={(e) => setProductQuery(e.target.value)} onFocus={scrollInputIntoView} placeholder="Search product, SKU, or shop..." />
+                <input value={productQuery} onChange={(e) => setProductQuery(e.target.value)} placeholder="Search product, SKU, or shop..." />
               </div>
               <button type="submit" className="admin-primary-button">Search</button>
             </form>
@@ -384,7 +380,7 @@ const SuperAdminDashboard = () => {
             <form onSubmit={searchProductsForDeal} className="admin-search-form">
               <div className="admin-search-box">
                 <FaSearch />
-                <input value={dealQuery} onChange={(e) => setDealQuery(e.target.value)} onFocus={scrollInputIntoView} placeholder="Search product for deal..." />
+                <input value={dealQuery} onChange={(e) => setDealQuery(e.target.value)} placeholder="Search product for deal..." />
               </div>
               <button type="submit" className="admin-primary-button">Search</button>
             </form>

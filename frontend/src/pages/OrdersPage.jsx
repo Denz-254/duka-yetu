@@ -86,7 +86,7 @@ const OrdersPage = () => {
           <button
             key={status || 'ALL'}
             onClick={() => setFilter(status)}
-            className={`px-3 py-1.5 rounded-lg text-sm ${
+            className={`status-filter-button px-3 py-1.5 rounded-lg text-sm ${
               filter === status ? 'bg-primary-600 text-white' : 'bg-white border text-gray-600'
             }`}
           >

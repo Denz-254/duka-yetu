@@ -294,14 +294,14 @@ const BranchesPage = () => {
                 </select>
               </div>
 
-              <div className="flex gap-3 pt-2">
+              <div className="form-action-row flex flex-col gap-3 pt-2 sm:flex-row">
                 <button type="submit" disabled={loading} className="btn-primary flex-1 py-3">
                   {loading ? 'Saving...' : editingBranch ? 'Update Branch' : 'Create Branch'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="btn-secondary px-6 py-3"
+                  className="btn-secondary flex-1 px-6 py-3"
                 >
                   Cancel
                 </button>

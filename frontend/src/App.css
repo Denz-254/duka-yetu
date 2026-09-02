@@ -104,20 +104,6 @@
     cursor: pointer;
   }
 
-  .btn-danger {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    background: #dc2626;
-    color: #fff;
-    font-weight: 700;
-    border-radius: 0.65rem;
-    padding: 0.7rem 1rem;
-    border: none;
-    cursor: pointer;
-  }
-
   .card {
     background: #fff;
     border-radius: 0.85rem;
@@ -2618,32 +2604,40 @@
   .input-primary,
   .btn-primary,
   .btn-secondary,
-  .btn-danger {
+  .form-action-row > * {
     width: 100%;
   }
 
-  .flex.gap-2,
-  .flex.gap-3,
-  .flex.gap-4,
-  .status-filter-row,
-  .subscription-actions,
-  .order-card-actions {
+  .status-filter-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+
+  .status-filter-button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .form-action-row {
     flex-direction: column !important;
-    align-items: stretch !important;
-  }
-
-  .flex.gap-2 > *,
-  .flex.gap-3 > *,
-  .flex.gap-4 > *,
-  .status-filter-row > *,
-  .subscription-actions > *,
-  .order-card-actions > * {
-    width: 100%;
   }
 
   .fixed.inset-0 .bg-white,
   .fixed.inset-0 .rounded-xl {
     width: min(100%, 100%);
+  }
+
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  input:focus,
+  select:focus,
+  textarea:focus {
+    scroll-margin-top: 120px;
   }
 
   .banner-inner {

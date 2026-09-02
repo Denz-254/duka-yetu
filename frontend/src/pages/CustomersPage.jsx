@@ -289,9 +289,9 @@ const CustomersPage = () => {
                 <label className="label-primary">Notes</label>
                 <textarea value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} className="input-primary bg-white text-gray-800" rows="3" />
               </div>
-              <div className="sm:col-span-2 flex gap-3">
+              <div className="sm:col-span-2 form-action-row flex flex-col gap-3 sm:flex-row">
                 <button disabled={loading} className="btn-primary flex-1">{loading ? 'Saving...' : 'Save Customer'}</button>
-                <button type="button" onClick={() => setShowFormModal(false)} className="btn-secondary">Cancel</button>
+                <button type="button" onClick={() => setShowFormModal(false)} className="btn-secondary flex-1">Cancel</button>
               </div>
             </form>
           </motion.div>

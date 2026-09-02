@@ -367,7 +367,7 @@ const StaffPage = () => {
                 </select>
               </div>
 
-              <div className="flex gap-3 pt-2">
+              <div className="form-action-row flex flex-col gap-3 pt-2 sm:flex-row">
                 <button
                   type="submit"
                   disabled={loading}
@@ -381,7 +381,7 @@ const StaffPage = () => {
                     setShowForm(false);
                     setEditingStaff(null);
                   }}
-                  className="btn-secondary px-6 py-3"
+                  className="btn-secondary flex-1 px-6 py-3"
                 >
                   Cancel
                 </button>

@@ -272,7 +272,7 @@ const SubscriptionPage = () => {
       </div>
 
       {/* Plans */}
-      <div className="subscription-plan-grid grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {plans.map((plan) => {
           const Icon = plan.icon;
           const isCurrent = plan.id === currentPlan && subscriptionStatus === 'ACTIVE';
@@ -404,7 +404,7 @@ const SubscriptionPage = () => {
       )}
 
       {/* Billing Cycle Toggle */}
-      <div className="flex flex-wrap items-center justify-center gap-4 py-2">
+      <div className="flex flex-col items-center justify-center gap-3 py-2 sm:flex-row sm:gap-4">
         <span className={`text-sm ${billingCycle === 'monthly' ? 'font-semibold text-gray-800' : 'text-gray-500'}`}>
           Monthly
         </span>
@@ -476,7 +476,7 @@ const SubscriptionPage = () => {
       </div>
 
       {/* Actions */}
-      <div className="subscription-actions flex flex-wrap gap-3">
+      <div className="flex flex-wrap gap-3">
         <button
           onClick={openBillingPortal}
           className="btn-primary flex items-center gap-2"
