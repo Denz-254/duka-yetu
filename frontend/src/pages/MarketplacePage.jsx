@@ -21,10 +21,6 @@ import useMarketCartStore from '../store/marketCartStore';
 import ProductCard from '../components/products/ProductCard';
 import { formatCurrency } from '../utils/helpers';
 
-const categoryFallbacks = {
-  default: 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=900&q=80',
-};
-
 const shopSections = [
   { label: 'New In', href: '#new-arrivals' },
   { label: 'Categories', href: '#shop-categories' },
@@ -129,8 +125,16 @@ const MarketplacePage = () => {
     id: category.id,
     title: category.name,
     subtitle: `${category.product_count || 0} items`,
-    image: category.image_url || categoryFallbacks.default,
+    image: category.image_url || '',
   }));
+
+  const handleCategorySelect = (categoryId) => {
+    setSelectedCategory(categoryId);
+    setShowAllProducts(true);
+    window.setTimeout(() => {
+      document.getElementById('top-picks')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 60);
+  };
 
   const featuredActive = heroSlides[heroIndex] || heroSlides[0] || null;
 
@@ -262,16 +266,16 @@ const MarketplacePage = () => {
         <section id="shop-categories" className="category-section">
           <h2>Shop By Category</h2>
           <div className="category-grid">
-            <button type="button" className={`category-filters ${selectedCategory === 'all' ? 'is-active' : ''}`} onClick={() => setSelectedCategory('all')}>
+            <button type="button" className={`category-filters ${selectedCategory === 'all' ? 'is-active' : ''}`} onClick={() => handleCategorySelect('all')}>
               All Products
             </button>
             {loading && !categoryCards.length && <div className="loading-box">Loading categories...</div>}
             {!loading && !categoryCards.length && <div className="loading-box">No categories listed on DukaMall yet.</div>}
             {categoryCards.map((card) => (
               <article key={card.id} className={`category-card ${selectedCategory === card.id ? 'is-active' : ''}`}>
-                <button type="button" className="category-button" onClick={() => setSelectedCategory(card.id)}>
+                <button type="button" className="category-button" onClick={() => handleCategorySelect(card.id)}>
                   <div className="category-image-wrap">
-                    <img src={card.image} alt={card.title} />
+                    {card.image ? <img src={card.image} alt={card.title} /> : <div className="category-image-placeholder" aria-label={`${card.title} category`} />}
                   </div>
                   <div className="category-card__meta">
                     <span>{card.title}</span>
