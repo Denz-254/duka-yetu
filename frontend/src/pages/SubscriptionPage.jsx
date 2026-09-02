@@ -272,7 +272,7 @@ const SubscriptionPage = () => {
       </div>
 
       {/* Plans */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="subscription-plan-grid grid grid-cols-1 md:grid-cols-3 gap-6">
         {plans.map((plan) => {
           const Icon = plan.icon;
           const isCurrent = plan.id === currentPlan && subscriptionStatus === 'ACTIVE';
@@ -476,7 +476,7 @@ const SubscriptionPage = () => {
       </div>
 
       {/* Actions */}
-      <div className="flex flex-wrap gap-3">
+      <div className="subscription-actions flex flex-wrap gap-3">
         <button
           onClick={openBillingPortal}
           className="btn-primary flex items-center gap-2"

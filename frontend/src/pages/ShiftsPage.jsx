@@ -42,7 +42,7 @@ const ShiftsPage = () => {
 
       {!isOwner && <ShiftClock onChange={load} />}
 
-      <div className="flex flex-wrap gap-2">
+      <div className="cashier-shifts-filters flex flex-wrap gap-2">
         {['', 'OPEN', 'CLOSED'].map((status) => (
           <button
             key={status || 'ALL'}
@@ -58,7 +58,7 @@ const ShiftsPage = () => {
       </div>
 
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-x-auto">
-        <table className="w-full">
+        <table className="cashier-shifts-table w-full">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50 text-left text-xs uppercase text-gray-500">
               <th className="px-4 py-3">Cashier</th>
@@ -79,28 +79,28 @@ const ShiftsPage = () => {
             ) : (
               rows.map((row) => (
                 <tr key={row.id} className="border-b border-gray-50">
-                  <td className="px-4 py-3">
+                  <td data-label="Cashier" className="px-4 py-3">
                     <p className="font-medium text-gray-800 flex items-center gap-2"><FaUser className="text-gray-400" /> {row.cashier_name}</p>
                     <p className="text-xs text-gray-400">{formatDuration(row.duration_minutes)}</p>
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-700">{formatDate(row.opened_at)}</td>
-                  <td className="px-4 py-3 font-semibold text-gray-800">{formatCurrency(row.opening_cash)}</td>
-                  <td className="px-4 py-3 text-sm text-gray-700">{row.closed_at ? formatDate(row.closed_at) : 'Still open'}</td>
-                  <td className="px-4 py-3 font-semibold text-gray-800">
+                  <td data-label="Clock in" className="px-4 py-3 text-sm text-gray-700">{formatDate(row.opened_at)}</td>
+                  <td data-label="Opening" className="px-4 py-3 font-semibold text-gray-800">{formatCurrency(row.opening_cash)}</td>
+                  <td data-label="Clock out" className="px-4 py-3 text-sm text-gray-700">{row.closed_at ? formatDate(row.closed_at) : 'Still open'}</td>
+                  <td data-label="Closing" className="px-4 py-3 font-semibold text-gray-800">
                     {row.closing_cash != null ? formatCurrency(row.closing_cash) : '—'}
                   </td>
-                  <td className="px-4 py-3">
+                  <td data-label="Sales made" className="px-4 py-3">
                     <p className="font-bold text-primary-700">{formatCurrency(row.total_sales)}</p>
                     <p className="text-xs text-gray-400">
                       Cash {formatCurrency(row.cash_sales)} · M-Pesa {formatCurrency(row.mpesa_sales)}
                     </p>
                   </td>
-                  <td className={`px-4 py-3 font-semibold ${
+                  <td data-label="Variance" className={`px-4 py-3 font-semibold ${
                     row.variance == null ? 'text-gray-400' : Number(row.variance) === 0 ? 'text-emerald-600' : Number(row.variance) < 0 ? 'text-red-600' : 'text-amber-600'
                   }`}>
                     {row.variance == null ? '—' : formatCurrency(row.variance)}
                   </td>
-                  <td className="px-4 py-3">
+                  <td data-label="Status" className="px-4 py-3">
                     <span className={`text-xs px-2 py-1 rounded-full ${
                       row.status === 'OPEN' ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-600'
                     }`}>
