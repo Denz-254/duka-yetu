@@ -71,7 +71,7 @@ const Layout = () => {
   }, [clearSubscription, logout, navigate]);
 
   const toggleSidebar = () => {
-    setSidebarOpen(!sidebarOpen);
+    setSidebarOpen((current) => !current);
   };
 
   return (
@@ -85,13 +85,22 @@ const Layout = () => {
         ☰
       </button>
 
+      {sidebarOpen && (
+        <button
+          type="button"
+          aria-label="Close menu"
+          onClick={() => setSidebarOpen(false)}
+          className="fixed inset-0 z-40 bg-black/30 md:hidden"
+        />
+      )}
+
       <Sidebar isOpen={sidebarOpen} toggleSidebar={toggleSidebar} />
       <main
         className={`transition-all duration-300 min-h-screen ${
           sidebarOpen ? 'md:ml-[280px]' : 'md:ml-[80px]'
         } ml-0`}
       >
-        <div className="p-4 md:p-6">
+        <div className="p-4 pt-16 md:p-6 md:pt-6">
           <Outlet />
         </div>
       </main>

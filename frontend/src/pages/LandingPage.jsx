@@ -184,13 +184,20 @@ const LandingPage = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.3 }}
-                className="flex flex-wrap items-center gap-4"
+                className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:flex-wrap"
               >
                 <Link
                   to="/register"
-                  className="btn-primary px-8 py-3 text-lg flex items-center gap-2"
+                  className="btn-primary px-8 py-3 text-lg flex items-center gap-2 w-full sm:w-auto justify-center"
                 >
                   Start Free Trial
+                  <FaArrowRight className="text-sm" />
+                </Link>
+                <Link
+                  to="/shop"
+                  className="btn-secondary px-8 py-3 text-lg flex items-center gap-2 w-full sm:w-auto justify-center"
+                >
+                  Shop Now
                   <FaArrowRight className="text-sm" />
                 </Link>
                 <Link
@@ -495,15 +502,18 @@ const LandingPage = () => {
         </div>
       </section>
       <footer className="bg-primary-900 px-4 py-10 text-primary-100">
-        <div className="container mx-auto flex flex-col items-center justify-between gap-5 md:flex-row">
-          <div className="flex items-center gap-3">
-            <FaStore className="text-primary-400" />
-            <span className="font-bold text-white">Duka Yetu</span>
+        <div className="container mx-auto flex flex-col items-center justify-between gap-5 text-center md:flex-row md:text-left">
+          <div className="flex flex-col items-center gap-3 md:flex-row md:items-center">
+            <div className="flex items-center gap-3">
+              <FaStore className="text-primary-400" />
+              <span className="font-bold text-white">Duka Yetu</span>
+            </div>
             <span className="text-sm text-primary-300">Built for businesses that are going places.</span>
           </div>
-          <div className="flex gap-6 text-sm">
+          <div className="flex flex-col gap-3 text-sm sm:flex-row sm:gap-6">
             <a href="#features" className="hover:text-white">Features</a>
             <a href="#pricing" className="hover:text-white">Pricing</a>
+            <Link to="/shop" className="hover:text-white">Shop</Link>
             <Link to="/login" className="hover:text-white">Sign in</Link>
           </div>
         </div>

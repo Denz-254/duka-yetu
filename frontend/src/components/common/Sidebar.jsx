@@ -41,6 +41,11 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [inventoryOpen, setInventoryOpen] = useState(false);
 
+  const isMobileView = () => typeof window !== 'undefined' && window.innerWidth < 768;
+  const closeOnMobile = () => {
+    if (isMobileView()) toggleSidebar();
+  };
+
   const navItems = [
     { path: '/dashboard', icon: FaHome, label: 'Dashboard', feature: 'basic_reports' },
     { path: '/pos', icon: FaShoppingCart, label: 'POS', feature: 'pos', cashierOnly: true },
@@ -87,10 +92,13 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
 
   return (
     <motion.div
-      initial={{ width: isOpen ? 280 : 80 }}
-      animate={{ width: isOpen ? 280 : 80 }}
+      initial={{ width: 280, x: 0 }}
+      animate={{
+        width: isOpen ? 280 : 80,
+        x: isMobileView() ? (isOpen ? 0 : -320) : 0,
+      }}
       transition={{ duration: 0.3, ease: 'easeInOut' }}
-      className="fixed left-0 top-0 h-full bg-gradient-to-b from-primary-800 to-primary-900 shadow-xl z-50 overflow-hidden"
+      className={`fixed left-0 top-0 h-full bg-gradient-to-b from-primary-800 to-primary-900 shadow-xl z-50 overflow-hidden ${isMobileView() && !isOpen ? 'pointer-events-none' : 'pointer-events-auto'}`}
     >
       {/* Logo */}
       <div className="flex items-center justify-between h-16 px-4 border-b border-primary-700/30">
@@ -146,6 +154,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             <Link
               key={item.path}
               to={item.path}
+              onClick={closeOnMobile}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 ${
                 isActive(item.path)
                   ? 'bg-white/20 text-white font-medium'
@@ -214,6 +223,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                     <Link
                       key={item.path}
                       to={item.path}
+                      onClick={closeOnMobile}
                       className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 text-sm ${
                         isActive(item.path)
                           ? 'bg-white/10 text-white'
@@ -237,6 +247,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             <Link
               key={item.path}
               to={item.path}
+              onClick={closeOnMobile}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 ${
                 isActive(item.path)
                   ? 'bg-white/20 text-white font-medium'
@@ -305,6 +316,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                     <Link
                       key={item.path}
                       to={item.path}
+                      onClick={closeOnMobile}
                       className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 text-sm ${
                         isActive(item.path)
                           ? 'bg-white/10 text-white'
@@ -325,7 +337,10 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
       {/* Logout */}
       <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-primary-700/30 bg-primary-900">
         <button
-          onClick={handleLogout}
+          onClick={() => {
+            closeOnMobile();
+            handleLogout();
+          }}
           className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-white/70 hover:bg-white/10 hover:text-white transition-all duration-200"
         >
           <FaSignOutAlt className="text-lg" />
