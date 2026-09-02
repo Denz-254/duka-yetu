@@ -1,8 +1,9 @@
 """Application configuration management."""
 
+import json
 from typing import Optional, List
 from pydantic_settings import BaseSettings
-from pydantic import ConfigDict, Field
+from pydantic import ConfigDict, Field, field_validator
 
 class Settings(BaseSettings):
     """Application settings."""
@@ -34,6 +35,28 @@ class Settings(BaseSettings):
     CORS_ORIGINS: List[str] = Field(
         default=["http://localhost:3000", "http://localhost:5173", "*"]
     )
+
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, value):
+        if value is None:
+            return ["*"]
+        if isinstance(value, list):
+            return [str(item).strip() for item in value if str(item).strip()]
+        if isinstance(value, str):
+            stripped = value.strip()
+            if not stripped:
+                return ["*"]
+            if stripped.startswith("["):
+                try:
+                    parsed = json.loads(stripped)
+                    if isinstance(parsed, list):
+                        return [str(item).strip() for item in parsed if str(item).strip()]
+                except json.JSONDecodeError:
+                    pass
+            return [item.strip() for item in stripped.replace(" ", "").split(",") if item.strip()]
+        return value
+
     ALLOWED_HOSTS: List[str] = Field(default=["*"])
 
     # Business rules
