@@ -63,6 +63,7 @@ class MarketCategory(BaseModel):
     id: str
     name: str
     color: str = "#059669"
+    image_url: Optional[str] = None
     product_count: int = 0
 
 
@@ -142,6 +143,7 @@ def list_marketplace_categories(db: Session = Depends(get_db)):
                 id=str(cat.id),
                 name=cat.name,
                 color=cat.color or "#059669",
+                image_url=cat.image_url,
                 product_count=count,
             )
         )

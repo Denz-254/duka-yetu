@@ -404,7 +404,7 @@ const SubscriptionPage = () => {
       )}
 
       {/* Billing Cycle Toggle */}
-      <div className="flex items-center justify-center gap-4 py-2">
+      <div className="flex flex-wrap items-center justify-center gap-4 py-2">
         <span className={`text-sm ${billingCycle === 'monthly' ? 'font-semibold text-gray-800' : 'text-gray-500'}`}>
           Monthly
         </span>
@@ -476,7 +476,7 @@ const SubscriptionPage = () => {
       </div>
 
       {/* Actions */}
-      <div className="flex flex-wrap gap-4">
+      <div className="flex flex-wrap gap-3">
         <button
           onClick={openBillingPortal}
           className="btn-primary flex items-center gap-2"

@@ -131,7 +131,7 @@ const StaffPage = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
           <FaUserPlus className="text-primary-600" />
           Staff Management
@@ -142,7 +142,7 @@ const StaffPage = () => {
             setFormData({ name: '', email: '', phone: '', username: '', password: '', role: 'CASHIER' });
             setShowForm(true);
           }}
-          className="btn-primary flex items-center gap-2"
+          className="btn-primary flex items-center gap-2 w-full sm:w-auto justify-center"
         >
           <FaPlus /> Add Staff
         </button>

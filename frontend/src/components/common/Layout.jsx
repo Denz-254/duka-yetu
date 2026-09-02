@@ -7,7 +7,7 @@ import { business as businessApi } from '../../api/endpoints';
 import { toast } from 'react-hot-toast';
 
 const Layout = () => {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 768 : true);
   const fetchSubscription = useSubscriptionStore((state) => state.fetchSubscription);
   const clearSubscription = useSubscriptionStore((state) => state.clear);
   const logout = useAuthStore((state) => state.logout);
@@ -15,6 +15,20 @@ const Layout = () => {
   const lastActivity = useRef(Date.now());
   const timeoutMinutes = useRef(60);
   const autoLogout = useRef(true);
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 768) {
+        setSidebarOpen(false);
+      } else {
+        setSidebarOpen(true);
+      }
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     fetchSubscription();
@@ -62,11 +76,20 @@ const Layout = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <button
+        type="button"
+        onClick={toggleSidebar}
+        className="fixed left-4 top-4 z-[60] inline-flex items-center justify-center rounded-xl bg-primary-700 p-3 text-white shadow-lg md:hidden"
+        aria-label="Toggle menu"
+      >
+        ☰
+      </button>
+
       <Sidebar isOpen={sidebarOpen} toggleSidebar={toggleSidebar} />
       <main
         className={`transition-all duration-300 min-h-screen ${
-          sidebarOpen ? 'ml-[280px]' : 'ml-[80px]'
-        }`}
+          sidebarOpen ? 'md:ml-[280px]' : 'md:ml-[80px]'
+        } ml-0`}
       >
         <div className="p-4 md:p-6">
           <Outlet />

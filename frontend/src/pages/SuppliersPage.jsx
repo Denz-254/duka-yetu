@@ -160,7 +160,7 @@ const SuppliersPage = () => {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
           <p className="text-2xl font-bold text-primary-600">{suppliers.length}</p>
           <p className="text-sm text-gray-500">Total Suppliers</p>

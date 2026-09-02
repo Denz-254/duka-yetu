@@ -245,6 +245,20 @@
 .main-nav a {
   color: #1f2937;
   opacity: 0.82;
+  transition: opacity 0.2s ease;
+}
+
+.main-nav a:hover {
+  opacity: 1;
+}
+
+.category-button {
+  border: none;
+  background: transparent;
+  width: 100%;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
 }
 
 .shop-button {
@@ -549,6 +563,15 @@
   cursor: pointer;
 }
 
+.category-card__meta__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #111827;
+}
+
 .deal-banner {
   position: relative;
   margin-top: 34px;
@@ -815,9 +838,49 @@
   padding: 4px;
 }
 
+.dashboard-header {
+  width: 100%;
+}
+
+.dashboard-date-chip {
+  width: fit-content;
+}
+
+.status-filter-row,
+.order-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 @media (min-width: 1100px) {
   .pos-product-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .pos-product-grid {
+    grid-template-columns: 1fr;
+    max-height: none;
+  }
+
+  .pos-cart-panel {
+    position: static;
+  }
+
+  .dashboard-header {
+    align-items: flex-start;
+  }
+
+  .dashboard-date-chip {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .status-filter-row,
+  .order-card-actions {
+    gap: 6px;
   }
 }
 
@@ -2513,6 +2576,21 @@
 @media (max-width: 640px) {
   .top-banner {
     padding: 0 12px;
+  }
+
+  .space-y-6 > * + * {
+    margin-top: 1rem;
+  }
+
+  .input-primary,
+  .btn-primary,
+  .btn-secondary {
+    width: 100%;
+  }
+
+  .fixed.inset-0 .bg-white,
+  .fixed.inset-0 .rounded-xl {
+    width: min(100%, 100%);
   }
 
   .banner-inner {

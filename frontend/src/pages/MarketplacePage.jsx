@@ -25,6 +25,14 @@ const categoryFallbacks = {
   default: 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=900&q=80',
 };
 
+const shopSections = [
+  { label: 'New In', href: '#new-arrivals' },
+  { label: 'Categories', href: '#shop-categories' },
+  { label: 'Top Picks', href: '#top-picks' },
+  { label: 'Deals', href: '#deal-of-the-day' },
+  { label: 'Support', href: '#shop-footer' },
+];
+
 const featurePills = [
   { icon: FaTruck, label: 'Free Delivery', text: 'On orders over KES 3,000' },
   { icon: FaUndo, label: 'Easy Returns', text: '30-day returns' },
@@ -117,22 +125,11 @@ const MarketplacePage = () => {
     toast.success(`${product.name} added to cart`);
   };
 
-  const categoryImageMap = {
-    Fashion: 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=900&q=80',
-    Home: 'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=900&q=80',
-    Beauty: 'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?auto=format&fit=crop&w=900&q=80',
-    Electronics: 'https://images.unsplash.com/photo-1546435770-a3e426bf472b?auto=format&fit=crop&w=900&q=80',
-    Lifestyle: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=900&q=80',
-    Women: 'https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=900&q=80',
-    Men: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=900&q=80',
-    Default: categoryFallbacks.default,
-  };
-
   const categoryCards = categories.map((category) => ({
     id: category.id,
     title: category.name,
     subtitle: `${category.product_count || 0} items`,
-    image: categoryImageMap[category.name] || categoryImageMap.Default,
+    image: category.image_url || categoryFallbacks.default,
   }));
 
   const featuredActive = heroSlides[heroIndex] || heroSlides[0] || null;
@@ -168,11 +165,9 @@ const MarketplacePage = () => {
           </div>
 
           <nav className="main-nav" aria-label="Main navigation">
-            <a href="#">New In</a>
-            <a href="#">Categories</a>
-            <a href="#">Top Picks</a>
-            <a href="#">Deals</a>
-            <a href="#">Support</a>
+            {shopSections.map((section) => (
+              <a key={section.label} href={section.href}>{section.label}</a>
+            ))}
           </nav>
 
           <Link to="/shop/checkout" className="shop-button">SHOP NOW</Link>
@@ -264,7 +259,7 @@ const MarketplacePage = () => {
           ))}
         </section>
 
-        <section className="category-section">
+        <section id="shop-categories" className="category-section">
           <h2>Shop By Category</h2>
           <div className="category-grid">
             <button type="button" className={`category-filters ${selectedCategory === 'all' ? 'is-active' : ''}`} onClick={() => setSelectedCategory('all')}>
@@ -274,21 +269,21 @@ const MarketplacePage = () => {
             {!loading && !categoryCards.length && <div className="loading-box">No categories listed on DukaMall yet.</div>}
             {categoryCards.map((card) => (
               <article key={card.id} className={`category-card ${selectedCategory === card.id ? 'is-active' : ''}`}>
-                <div className="category-image-wrap">
-                  <img src={card.image} alt={card.title} />
-                </div>
-                <div className="category-card__meta">
-                  <span>{card.title}</span>
-                  <button type="button" onClick={() => setSelectedCategory(card.id)}>
-                    {card.subtitle} <FaArrowRight />
-                  </button>
-                </div>
+                <button type="button" className="category-button" onClick={() => setSelectedCategory(card.id)}>
+                  <div className="category-image-wrap">
+                    <img src={card.image} alt={card.title} />
+                  </div>
+                  <div className="category-card__meta">
+                    <span>{card.title}</span>
+                    <span className="category-card__meta__cta">{card.subtitle} <FaArrowRight /></span>
+                  </div>
+                </button>
               </article>
             ))}
           </div>
         </section>
 
-        <section className="deal-banner">
+        <section id="deal-of-the-day" className="deal-banner">
           <div className="deal-copy">
             <p className="deal-label">DEAL OF THE DAY</p>
             <h3>
@@ -336,8 +331,9 @@ const MarketplacePage = () => {
           </div>
         </section>
 
-        <section className="new-arrivals">
+        <section id="top-picks" className="new-arrivals">
           <div className="section-header">
+            <h2 id="new-arrivals">New Arrivals</h2>
             <h2>New Arrivals</h2>
             <button
               type="button"
@@ -384,7 +380,7 @@ const MarketplacePage = () => {
         </section>
       </main>
 
-      <footer className="shop-footer">
+      <footer id="shop-footer" className="shop-footer">
         <div className="footer-inner">
           <div className="footer-brand">
             <div className="brand-block brand-block--footer">

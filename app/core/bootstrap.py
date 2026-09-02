@@ -55,6 +55,11 @@ def ensure_schema_patches(db: Session) -> None:
         db.commit()
         print("Schema patch: products.category_id added")
 
+    if not _column_exists(db, "categories", "image_url"):
+        db.execute(text("ALTER TABLE categories ADD COLUMN image_url VARCHAR(500)"))
+        db.commit()
+        print("Schema patch: categories.image_url added")
+
     # Featured product hero placement
     if not _column_exists(db, "products", "is_featured"):
         db.execute(

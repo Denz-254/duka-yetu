@@ -81,7 +81,7 @@ const OrdersPage = () => {
         </div>
       )}
 
-      <div className="flex gap-2">
+      <div className="status-filter-row flex flex-wrap gap-2">
         {['', 'PENDING', 'PROCESSING', 'DELIVERED', 'CANCELLED'].map((status) => (
           <button
             key={status || 'ALL'}
@@ -130,7 +130,7 @@ const OrdersPage = () => {
                   </div>
                 </div>
                 {order.payment_status === 'PAID' && (
-                  <div className="flex gap-2">
+                  <div className="order-card-actions flex flex-wrap gap-2">
                     <button onClick={() => downloadInvoice(order)} className="text-xs px-3 py-1.5 rounded bg-gray-900 text-white inline-flex items-center gap-1">
                       <FaDownload /> Invoice PDF
                     </button>

@@ -76,7 +76,7 @@ const BusinessProfilePage = () => {
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="flex items-center gap-6 pb-6 border-b border-gray-100">
+          <div className="flex flex-col sm:flex-row items-center sm:items-center gap-4 sm:gap-6 pb-6 border-b border-gray-100">
             <div className="w-24 h-24 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0 relative">
               {business.logo ? (
                 <img src={business.logo} alt="Business logo" className="w-full h-full rounded-full object-cover" />

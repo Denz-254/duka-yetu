@@ -180,7 +180,7 @@ const POSPage = () => {
     <div className="space-y-6">
       <ShiftClock compact onChange={setShift} refreshToken={shiftRefresh} />
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
             <FaCashRegister className="text-primary-600" />
@@ -188,7 +188,7 @@ const POSPage = () => {
           </h1>
           <p className="text-gray-500 text-sm mt-1">Quick and easy checkout for your customers</p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2 text-sm text-gray-500 bg-white px-4 py-2 rounded-lg border border-gray-100">
             <FaUser className="text-primary-600" />
             <span>{user?.name || 'Cashier'}</span>
@@ -247,7 +247,7 @@ const POSPage = () => {
 
         {/* Cart */}
         <div className="lg:col-span-1">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 sticky top-4">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 pos-cart-panel sticky top-4">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-gray-800">Cart</h2>
               {items.length > 0 && (

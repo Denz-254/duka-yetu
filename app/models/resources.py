@@ -23,6 +23,7 @@ class Category(TenantRecord, Base):
     name = Column(String(255), nullable=False)
     description = Column(String(500))
     color = Column(String(20), default="#059669", nullable=False)
+    image_url = Column(String(500), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
 
     __table_args__ = (

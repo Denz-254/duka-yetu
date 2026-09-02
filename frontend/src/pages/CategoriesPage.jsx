@@ -19,6 +19,7 @@ const CategoriesPage = () => {
     name: '',
     description: '',
     color: '#059669',
+    image_url: '',
   });
 
   useEffect(() => {
@@ -51,7 +52,7 @@ const CategoriesPage = () => {
       }
       setShowModal(false);
       setEditingCategory(null);
-      setFormData({ name: '', description: '', color: '#059669' });
+      setFormData({ name: '', description: '', color: '#059669', image_url: '' });
       fetchCategories();
     } catch (error) {
       toast.error('Save failed');
@@ -91,7 +92,7 @@ const CategoriesPage = () => {
         <button
           onClick={() => {
             setEditingCategory(null);
-            setFormData({ name: '', description: '', color: '#059669' });
+            setFormData({ name: '', description: '', color: '#059669', image_url: '' });
             setShowModal(true);
           }}
           className="btn-primary flex items-center gap-2"
@@ -146,6 +147,7 @@ const CategoriesPage = () => {
                         name: category.name,
                         description: category.description || '',
                         color: category.color,
+                        image_url: category.image_url || '',
                       });
                       setShowModal(true);
                     }}
@@ -223,6 +225,17 @@ const CategoriesPage = () => {
                     placeholder="#059669"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="label-primary">Image URL</label>
+                <input
+                  type="url"
+                  value={formData.image_url}
+                  onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
+                  className="input-primary bg-white text-gray-800"
+                  placeholder="https://example.com/category.jpg"
+                />
               </div>
 
               <div className="flex gap-3 pt-2">

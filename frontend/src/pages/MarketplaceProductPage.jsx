@@ -24,7 +24,7 @@ const MarketplaceProductPage = () => {
   return (
     <div className="min-h-screen bg-[#f1f1f2]">
       <div className="bg-white border-b">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-5xl mx-auto px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <Link to="/shop" className="flex items-center gap-2 text-gray-600 hover:text-primary-600">
             <FaArrowLeft /> Back to shop
           </Link>
@@ -34,7 +34,7 @@ const MarketplaceProductPage = () => {
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 py-6 grid md:grid-cols-2 gap-6">
+      <div className="max-w-5xl mx-auto px-4 py-6 grid gap-6 md:grid-cols-2">
         <div className="bg-white rounded-lg p-4 shadow-sm">
           <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
             {product.image_url ? (

@@ -136,7 +136,7 @@ const PaymentSettingsPage = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
             <FaCreditCard className="text-primary-600" />
@@ -148,7 +148,7 @@ const PaymentSettingsPage = () => {
         </div>
         <button
           type="button"
-          className="text-xs text-gray-500 underline"
+          className="text-xs text-gray-500 underline self-start"
           onClick={() => {
             sessionStorage.removeItem(unlockKey);
             setUnlocked(false);

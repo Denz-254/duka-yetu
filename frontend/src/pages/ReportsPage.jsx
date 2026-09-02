@@ -116,11 +116,11 @@ const ReportsPage = () => {
           </h1>
           <p className="text-gray-500 text-sm mt-1">Live sales data from your store</p>
         </div>
-        <div className="flex items-center gap-3">
-          <button type="button" onClick={downloadReport} className="btn-secondary flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+          <button type="button" onClick={downloadReport} className="btn-secondary flex items-center gap-2 flex-1 sm:flex-none justify-center">
             <FaDownload /> Export
           </button>
-          <button type="button" onClick={printReport} className="btn-primary flex items-center gap-2">
+          <button type="button" onClick={printReport} className="btn-primary flex items-center gap-2 flex-1 sm:flex-none justify-center">
             <FaPrint /> Print
           </button>
         </div>
