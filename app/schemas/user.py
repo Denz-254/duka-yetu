@@ -28,6 +28,13 @@ class UserCreate(BaseModel):
             raise ValueError('Password must contain at least one number')
         return v
 
+    @validator('name', 'username', pre=True)
+    def strip_required_text(cls, v):
+        value = v.strip()
+        if not value:
+            raise ValueError('This field cannot be blank')
+        return value
+
 class UserUpdate(BaseModel):
     """Update staff request."""
     name: Optional[str] = Field(None, min_length=2, max_length=255)
@@ -37,6 +44,15 @@ class UserUpdate(BaseModel):
     role: Optional[str] = Field(None, pattern="^(OWNER|ADMIN|MANAGER|CASHIER)$")
     is_active: Optional[bool] = None
     branch_id: Optional[str] = None
+
+    @validator('name', 'username', pre=True)
+    def strip_optional_text(cls, v):
+        if v is None:
+            return v
+        value = v.strip()
+        if not value:
+            raise ValueError('This field cannot be blank')
+        return value
 
 class UserPasswordReset(BaseModel):
     """Reset password request."""

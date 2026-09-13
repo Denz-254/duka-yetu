@@ -52,14 +52,21 @@ const StaffPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    const cleanedFormData = {
+      ...formData,
+      name: formData.name.trim(),
+      email: formData.email.trim(),
+      phone: formData.phone.trim(),
+      username: formData.username.trim(),
+    };
     try {
       if (editingStaff) {
-        const updateData = { ...formData };
+        const updateData = { ...cleanedFormData };
         delete updateData.password;
         await api.put(`/users/${editingStaff.id}`, updateData);
         toast.success('Staff updated successfully');
       } else {
-        await api.post('/users/', formData);
+        await api.post('/users/', cleanedFormData);
         toast.success('Staff created successfully');
       }
       setShowForm(false);

@@ -26,6 +26,14 @@ class BusinessRegistrationRequest(BaseModel):
             raise ValueError('Phone number must be between 10 and 15 digits')
         return v
 
+    @field_validator('business_name', 'owner_name', 'username', mode='before')
+    @classmethod
+    def strip_required_text(cls, v: str) -> str:
+        value = v.strip()
+        if not value:
+            raise ValueError('This field cannot be blank')
+        return value
+
     @field_validator('password')
     @classmethod
     def validate_password(cls, v: str) -> str:

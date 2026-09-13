@@ -25,7 +25,14 @@ const RegisterPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const result = await register(formData);
+    const result = await register({
+      ...formData,
+      business_name: formData.business_name.trim(),
+      owner_name: formData.owner_name.trim(),
+      username: formData.username.trim(),
+      email: formData.email.trim(),
+      phone: formData.phone.trim(),
+    });
     if (result.success) {
       toast.success(result.message || 'Registration submitted for approval');
       navigate('/pending-approval');

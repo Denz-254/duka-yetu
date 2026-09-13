@@ -59,6 +59,24 @@ def test_register_duplicate_email(client: TestClient, test_session):
     # API returns 422 for validation errors or 400 for business logic
     assert response.status_code in [400, 422]
 
+
+def test_register_rejects_whitespace_only_identity_fields(client: TestClient):
+    """Registration must reject identity fields containing only whitespace."""
+    response = client.post(
+        "/api/v1/auth/register",
+        json={
+            "business_name": "   ",
+            "owner_name": "Test Owner",
+            "username": f"owner_{uuid.uuid4().hex[:8]}",
+            "email": f"blank_{uuid.uuid4().hex[:8]}@example.com",
+            "phone": "0712345678",
+            "password": "StrongPass123!",
+            "business_type": "retail",
+        },
+    )
+
+    assert response.status_code == 422
+
 def test_login(client: TestClient, test_session):
     """Test user login."""
     import uuid
