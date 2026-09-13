@@ -16,6 +16,14 @@ const getApiError = (error, fallback) => {
   return fallback;
 };
 
+const isNetworkError = (error) => !error.response && (
+  error.code === 'ERR_NETWORK' ||
+  error.code === 'ECONNABORTED' ||
+  error.message === 'Network Error'
+);
+
+const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+
 const useAuthStore = create(
   persist(
     (set, get) => ({
@@ -29,7 +37,25 @@ const useAuthStore = create(
       login: async (username, password) => {
         set({ loading: true, error: null });
         try {
-          const response = await api.post('/auth/login', { username, password });
+          let response;
+          let lastError;
+          for (let attempt = 1; attempt <= 2; attempt += 1) {
+            try {
+              response = await api.post('/auth/login', { username, password });
+              break;
+            } catch (error) {
+              lastError = error;
+              if (!isNetworkError(error) || attempt === 2) throw error;
+              console.warn('Login network request failed; retrying once', {
+                attempt,
+                code: error.code,
+                baseURL: error.config?.baseURL,
+                url: error.config?.url,
+              });
+              await wait(1500);
+            }
+          }
+          if (!response) throw lastError;
           const { user, business, token, message } = response.data;
           set({
             user,
@@ -46,6 +72,8 @@ const useAuthStore = create(
             code: error.code,
             status: error.response?.status,
             detail: error.response?.data?.detail,
+            responseData: error.response?.data,
+            baseURL: error.config?.baseURL,
             url: error.config?.url,
           });
           set({
