@@ -2,6 +2,20 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import api from '../api/client';
 
+const getApiError = (error, fallback) => {
+  const responseData = error.response?.data;
+  const detail = responseData?.detail;
+  const message = Array.isArray(detail)
+    ? detail.map((item) => item.msg || item.message).filter(Boolean).join(', ')
+    : detail || responseData?.message;
+
+  if (message) return message;
+  if (error.code === 'ECONNABORTED') return 'The server took too long to respond. Please try again.';
+  if (!error.response) return 'Unable to reach the server. Check your connection and try again.';
+  if (error.response.status >= 500) return 'The server encountered an error. Please try again shortly.';
+  return fallback;
+};
+
 const useAuthStore = create(
   persist(
     (set, get) => ({
@@ -27,11 +41,18 @@ const useAuthStore = create(
           localStorage.setItem('token', token.access_token);
           return { success: true, user, business, message };
         } catch (error) {
+          const message = getApiError(error, 'Login failed');
+          console.error('Login request failed', {
+            code: error.code,
+            status: error.response?.status,
+            detail: error.response?.data?.detail,
+            url: error.config?.url,
+          });
           set({
-            error: error.response?.data?.detail || 'Login failed',
+            error: message,
             loading: false,
           });
-          return { success: false, error: error.response?.data?.detail };
+          return { success: false, error: message };
         }
       },
 

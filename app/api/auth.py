@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from typing import Optional
 from pydantic import BaseModel, EmailStr, Field
+import logging
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
@@ -29,6 +30,7 @@ from app.schemas.auth import (
 
 router = APIRouter()
 security = HTTPBearer()
+logger = logging.getLogger("duka_yetu.auth")
 
 @router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
 async def register(
@@ -142,8 +144,10 @@ async def login(
     """
     Login with username and password.
     """
+    logger.info("Login attempt username=%s", request.username)
     user = db.query(User).filter(User.username == request.username).first()
     if not user:
+        logger.warning("Login rejected username=%s reason=unknown_user", request.username)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials",
@@ -153,6 +157,12 @@ async def login(
     now = datetime.utcnow()
     if user.locked_until and user.locked_until > now:
         remaining = int((user.locked_until - now).total_seconds() // 60) + 1
+        logger.warning(
+            "Login rejected username=%s user_id=%s reason=account_locked remaining_minutes=%s",
+            request.username,
+            user.id,
+            remaining,
+        )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Account locked. Try again in {remaining} min",
@@ -173,18 +183,32 @@ async def login(
             user.locked_until = now + timedelta(minutes=lockout_mins)
             user.failed_login_attempts = 0
             db.commit()
+            logger.warning(
+                "Login rejected username=%s user_id=%s reason=lockout threshold=%s duration_minutes=%s",
+                request.username,
+                user.id,
+                max_attempts,
+                lockout_mins,
+            )
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Too many attempts. Locked {lockout_mins} min",
             )
         db.commit()
         left = max_attempts - attempts
+        logger.warning(
+            "Login rejected username=%s user_id=%s reason=invalid_password attempts_remaining=%s",
+            request.username,
+            user.id,
+            left,
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Invalid credentials ({left} left)",
         )
 
     if not user.is_active:
+        logger.warning("Login rejected username=%s user_id=%s reason=user_disabled", request.username, user.id)
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Account disabled",
@@ -198,6 +222,7 @@ async def login(
 
     # Super admin / shopper has no store business
     if user.role == "SUPER_ADMIN":
+        logger.info("Login successful username=%s user_id=%s role=SUPER_ADMIN", request.username, user.id)
         token_data = {
             "sub": str(user.id),
             "business_id": None,
@@ -225,6 +250,7 @@ async def login(
         )
 
     if user.role == "SHOPPER":
+        logger.info("Login successful username=%s user_id=%s role=SHOPPER", request.username, user.id)
         token_data = {
             "sub": str(user.id),
             "business_id": None,
@@ -254,11 +280,23 @@ async def login(
     # Get business
     business = db.query(Business).filter(Business.id == user.business_id).first()
     if not business:
+        logger.error(
+            "Login failed username=%s user_id=%s reason=business_not_found business_id=%s",
+            request.username,
+            user.id,
+            user.business_id,
+        )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Business not found",
         )
     if not business.is_active:
+        logger.warning(
+            "Login rejected username=%s user_id=%s reason=business_disabled business_id=%s",
+            request.username,
+            user.id,
+            business.id,
+        )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Business disabled",
@@ -266,6 +304,12 @@ async def login(
 
     approval = business.approval_status or "PENDING"
     if approval == "REJECTED":
+        logger.warning(
+            "Login rejected username=%s user_id=%s reason=business_rejected business_id=%s",
+            request.username,
+            user.id,
+            business.id,
+        )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=business.rejection_reason
@@ -283,6 +327,15 @@ async def login(
     message = None
     if approval == "PENDING":
         message = "Awaiting approval. POS locked until approved."
+
+    logger.info(
+        "Login successful username=%s user_id=%s business_id=%s role=%s approval_status=%s",
+        request.username,
+        user.id,
+        business.id,
+        user.role,
+        approval,
+    )
 
     return AuthResponse(
         user=UserResponse(

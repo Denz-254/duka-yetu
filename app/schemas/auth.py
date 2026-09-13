@@ -52,6 +52,14 @@ class LoginRequest(BaseModel):
     username: str = Field(..., min_length=1, max_length=100)
     password: str = Field(..., min_length=1)
 
+    @field_validator('username', mode='before')
+    @classmethod
+    def strip_username(cls, v: str) -> str:
+        value = v.strip()
+        if not value:
+            raise ValueError('Username cannot be blank')
+        return value
+
 
 class ChangePasswordRequest(BaseModel):
     current_password: str = Field(..., min_length=1)

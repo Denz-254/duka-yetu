@@ -15,7 +15,7 @@ const LoginPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const result = await login(username, password);
+    const result = await login(username.trim(), password);
     if (result.success) {
       if (result.user?.role === 'SUPER_ADMIN') {
         toast.success(result.message || 'Welcome, Super Admin');
