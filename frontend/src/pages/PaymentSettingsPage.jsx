@@ -10,13 +10,9 @@ const defaultSettings = {
   card_enabled: true,
   bank_enabled: false,
   mpesa_account_type: 'paybill',
-  mpesa_shortcode: '174379',
+  mpesa_shortcode: '',
   mpesa_send_money_phone: '',
-  mpesa_consumer_key: '',
-  mpesa_consumer_secret: '',
   mpesa_passkey: '',
-  mpesa_consumer_key_set: false,
-  mpesa_consumer_secret_set: false,
   mpesa_passkey_set: false,
   card_processor: 'stripe',
   stripe_publishable_key: '',
@@ -76,12 +72,6 @@ const PaymentSettingsPage = () => {
         tax_rate: settings.tax_rate,
       };
 
-      if (settings.mpesa_consumer_key?.trim()) {
-        payload.mpesa_consumer_key = settings.mpesa_consumer_key.trim();
-      }
-      if (settings.mpesa_consumer_secret?.trim()) {
-        payload.mpesa_consumer_secret = settings.mpesa_consumer_secret.trim();
-      }
       if (settings.mpesa_passkey?.trim()) {
         payload.mpesa_passkey = settings.mpesa_passkey.trim();
       }
@@ -90,8 +80,6 @@ const PaymentSettingsPage = () => {
       setSettings((current) => ({
         ...current,
         ...data,
-        mpesa_consumer_key: '',
-        mpesa_consumer_secret: '',
         mpesa_passkey: '',
       }));
       toast.success('Payment settings saved successfully');
@@ -143,7 +131,7 @@ const PaymentSettingsPage = () => {
             Payment Settings
           </h1>
           <p className="text-gray-500 text-sm mt-1">
-            Configure payment methods and your business M-Pesa Paybill/Till for STK Push
+            Configure payment methods and the business M-Pesa destination for STK Push
           </p>
         </div>
         <button
@@ -238,7 +226,7 @@ const PaymentSettingsPage = () => {
                       required
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                      For shops without a till or paybill. POS cashiers confirm after the customer sends money to this number. Online DukaMall checkout still uses the platform STK and pays out to this phone.
+                      POS cashiers record this as a manual payment. STK Push and online checkout require a Paybill or Till.
                     </p>
                   </div>
                 ) : (
@@ -248,20 +236,13 @@ const PaymentSettingsPage = () => {
                   </div>
                 )}
                 {settings.mpesa_account_type !== 'send_money' && (
-                  <>
-                    <div>
-                      <label className="label-primary">Consumer Key {settings.mpesa_consumer_key_set ? '(saved)' : ''}</label>
-                      <input type="password" value={settings.mpesa_consumer_key} onChange={(e) => setSettings({ ...settings, mpesa_consumer_key: e.target.value })} className="input-primary bg-white text-gray-800" autoComplete="off" />
-                    </div>
-                    <div>
-                      <label className="label-primary">Consumer Secret {settings.mpesa_consumer_secret_set ? '(saved)' : ''}</label>
-                      <input type="password" value={settings.mpesa_consumer_secret} onChange={(e) => setSettings({ ...settings, mpesa_consumer_secret: e.target.value })} className="input-primary bg-white text-gray-800" autoComplete="off" />
-                    </div>
-                    <div className="md:col-span-2">
-                      <label className="label-primary">Passkey {settings.mpesa_passkey_set ? '(saved)' : ''}</label>
-                      <input type="password" value={settings.mpesa_passkey} onChange={(e) => setSettings({ ...settings, mpesa_passkey: e.target.value })} className="input-primary bg-white text-gray-800" autoComplete="off" />
-                    </div>
-                  </>
+                  <div className="md:col-span-2">
+                    <label className="label-primary">Business STK Passkey {settings.mpesa_passkey_set ? '(saved)' : ''}</label>
+                    <input type="password" value={settings.mpesa_passkey} onChange={(e) => setSettings({ ...settings, mpesa_passkey: e.target.value })} className="input-primary bg-white text-gray-800" autoComplete="off" />
+                    <p className="text-xs text-gray-500 mt-1">
+                      The platform manages the shared Daraja consumer key and secret. Enter the passkey issued for this Paybill or Till.
+                    </p>
+                  </div>
                 )}
               </div>
             </div>

@@ -38,36 +38,29 @@ def normalize_phone(phone: str) -> str:
 
 def resolve_credentials(business_settings: dict) -> dict:
     """
-    Resolve M-Pesa credentials for a business.
-
-    Prefer business payment settings; fall back to platform sandbox env vars.
+    Resolve shared Daraja API credentials and the business STK destination.
     """
     payment = (business_settings or {}).get("payment") or {}
-    consumer_key = (payment.get("mpesa_consumer_key") or settings.MPESA_CONSUMER_KEY or "").strip()
-    consumer_secret = (payment.get("mpesa_consumer_secret") or settings.MPESA_CONSUMER_SECRET or "").strip()
-    passkey = (payment.get("mpesa_passkey") or settings.MPESA_PASSKEY or "").strip()
-    shortcode = (payment.get("mpesa_shortcode") or settings.MPESA_SHORTCODE or "").strip()
+    consumer_key = (settings.MPESA_CONSUMER_KEY or "").strip()
+    consumer_secret = (settings.MPESA_CONSUMER_SECRET or "").strip()
+    passkey = (payment.get("mpesa_passkey") or "").strip()
+    shortcode = (payment.get("mpesa_shortcode") or "").strip()
     account_type = (payment.get("mpesa_account_type") or "paybill").strip().lower()
-    send_money_phone = (payment.get("mpesa_send_money_phone") or "").strip()
 
     if account_type not in {"paybill", "till", "send_money"}:
         account_type = "paybill"
 
     if account_type == "send_money":
-        if not send_money_phone:
-            raise MpesaError(
-                "Add your M-Pesa Send Money phone number in Payment Settings."
-            )
-        platform = resolve_platform_credentials()
-        platform["payout_phone"] = normalize_phone(send_money_phone)
-        platform["collection_mode"] = "send_money"
-        return platform
+        raise MpesaError(
+            "STK Push requires a business Paybill or Till. Send Money is available "
+            "only as a manual POS payment method."
+        )
 
     missing = [
         name
         for name, value in [
-            ("consumer key", consumer_key),
-            ("consumer secret", consumer_secret),
+            ("platform consumer key", consumer_key),
+            ("platform consumer secret", consumer_secret),
             ("passkey", passkey),
             ("shortcode", shortcode),
         ]
@@ -77,7 +70,8 @@ def resolve_credentials(business_settings: dict) -> dict:
         raise MpesaError(
             "M-Pesa is not configured. Add "
             + ", ".join(missing)
-            + " in Payment Settings (or platform .env for sandbox)."
+            + ". Set platform consumer credentials in the backend environment "
+            "and the business shortcode/passkey in Payment Settings."
         )
 
     return {

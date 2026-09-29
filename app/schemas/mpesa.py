@@ -48,12 +48,8 @@ class PaymentSettingsPublic(BaseModel):
     bank_enabled: bool = False
     mpesa_account_type: str = "paybill"
     mpesa_shortcode: str = ""
-    mpesa_consumer_key_set: bool = False
-    mpesa_consumer_secret_set: bool = False
     mpesa_passkey_set: bool = False
     currency: str = "KES"
     tax_rate: float = 16
     # Optional write-only fields accepted on update (never returned)
-    mpesa_consumer_key: Optional[str] = None
-    mpesa_consumer_secret: Optional[str] = None
     mpesa_passkey: Optional[str] = None

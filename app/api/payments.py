@@ -183,10 +183,15 @@ def mpesa_collection_mode(
     if account_type not in {"paybill", "till", "send_money"}:
         account_type = "paybill"
     send_phone = (payment.get("mpesa_send_money_phone") or business.phone or "").strip()
+    try:
+        resolve_credentials(business.settings or {})
+        stk_available = True
+    except MpesaError:
+        stk_available = False
     return {
         "account_type": account_type,
         "send_money_phone": send_phone,
-        "stk_available": account_type in {"paybill", "till"} or bool(settings.MPESA_CONSUMER_KEY),
+        "stk_available": stk_available,
         "mpesa_enabled": payment.get("mpesa_enabled", True) is not False,
     }
 

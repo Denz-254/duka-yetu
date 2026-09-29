@@ -283,11 +283,10 @@ def update_business_profile(
 
 
 _PAYMENT_SECRET_KEYS = {
-    "mpesa_consumer_key",
-    "mpesa_consumer_secret",
     "mpesa_passkey",
     "stripe_secret_key",
 }
+_LEGACY_BUSINESS_MPESA_KEYS = {"mpesa_consumer_key", "mpesa_consumer_secret"}
 
 
 def _public_settings(section: str, values: dict) -> dict:
@@ -302,11 +301,15 @@ def _public_settings(section: str, values: dict) -> dict:
     for key in _PAYMENT_SECRET_KEYS:
         stored = data.pop(key, None)
         data[f"{key}_set"] = bool(stored)
+    for key in _LEGACY_BUSINESS_MPESA_KEYS:
+        data.pop(key, None)
     return data
 
 
 def _merge_payment_settings(existing: dict, incoming: dict) -> dict:
     merged = {**(existing or {}), **(incoming or {})}
+    for key in _LEGACY_BUSINESS_MPESA_KEYS:
+        merged.pop(key, None)
     for key in _PAYMENT_SECRET_KEYS:
         value = incoming.get(key) if incoming else None
         # Keep previous secret when UI sends blank / masked placeholder.
@@ -346,7 +349,7 @@ def update_business_settings(
     existing_section = dict(current.get(payload.section) or {})
 
     if payload.section == "payment":
-        # Stripe secret keys remain env-only; M-Pesa secrets are per-business.
+        # Gateway API credentials are environment-only; the M-Pesa passkey is business-specific.
         if payload.values.get("stripe_secret_key"):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

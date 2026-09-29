@@ -308,6 +308,9 @@ async def marketplace_checkout(payload: MarketplaceCheckoutRequest, db: Session 
         )
 
     business = db.query(Business).filter(Business.id == business_id).first()
+    payment_settings = (business.settings or {}).get("payment") or {}
+    if payment_settings.get("mpesa_enabled") is False:
+        raise HTTPException(status_code=400, detail="M-Pesa is disabled for this seller")
     try:
         credentials = resolve_credentials(business.settings or {})
     except MpesaError as exc:
