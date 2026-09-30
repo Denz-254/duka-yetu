@@ -21,6 +21,7 @@ class SaleCreate(BaseModel):
     """Sale creation request."""
     items: List[SaleItemCreate] = Field(..., min_items=1)
     payment_method: str = "CASH"
+    mpesa_receipt_number: Optional[str] = None
     
     @validator('payment_method')
     def validate_payment_method(cls, v):

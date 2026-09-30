@@ -9,6 +9,8 @@ const OrdersPage = () => {
   const [notifications, setNotifications] = useState([]);
   const [filter, setFilter] = useState('');
   const [loading, setLoading] = useState(true);
+  const [receipts, setReceipts] = useState({});
+  const [markingId, setMarkingId] = useState('');
 
   const load = async () => {
     setLoading(true);
@@ -43,6 +45,21 @@ const OrdersPage = () => {
     }
   };
 
+  const markPaid = async (order) => {
+    setMarkingId(order.id);
+    try {
+      await api.post(`/orders/${order.id}/mark-paid`, {
+        mpesa_receipt_number: (receipts[order.id] || '').trim() || null,
+      });
+      toast.success('Marked as paid');
+      load();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Could not mark this order as paid');
+    } finally {
+      setMarkingId('');
+    }
+  };
+
   const downloadInvoice = async (order) => {
     try {
       const res = await api.get(`/orders/${order.id}/invoice`, { responseType: 'blob' });
@@ -54,7 +71,7 @@ const OrdersPage = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
             <FaBoxOpen className="text-primary-600" /> Online Orders
@@ -129,6 +146,37 @@ const OrdersPage = () => {
                     </div>
                   </div>
                 </div>
+                {order.payment_status !== 'PAID' && (
+                  <div className="rounded-lg bg-green-50 border border-green-100 p-3 space-y-2">
+                    <p className="text-sm font-medium text-green-900">
+                      Waiting for the M-Pesa message. Confirm it, then mark this order paid.
+                    </p>
+                    {(order.payment_details?.steps || []).length > 0 && (
+                      <ol className="list-decimal pl-4 text-xs text-green-900 space-y-1">
+                        {order.payment_details.steps.map((step) => (
+                          <li key={step}>{step}</li>
+                        ))}
+                      </ol>
+                    )}
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <input
+                        type="text"
+                        value={receipts[order.id] || ''}
+                        onChange={(e) => setReceipts((current) => ({ ...current, [order.id]: e.target.value.toUpperCase() }))}
+                        className="input-primary bg-white text-gray-800"
+                        placeholder="M-Pesa code (optional)"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => markPaid(order)}
+                        disabled={markingId === order.id}
+                        className="text-sm px-3 py-2 rounded bg-green-700 text-white whitespace-nowrap"
+                      >
+                        {markingId === order.id ? 'Saving...' : 'Mark as paid'}
+                      </button>
+                    </div>
+                  </div>
+                )}
                 {order.payment_status === 'PAID' && (
                   <div className="order-card-actions flex flex-wrap gap-2">
                     <button onClick={() => downloadInvoice(order)} className="text-xs px-3 py-1.5 rounded bg-gray-900 text-white inline-flex items-center gap-1">

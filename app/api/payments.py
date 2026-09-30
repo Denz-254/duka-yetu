@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
-from typing import Any, List, Optional, Tuple, Union
+from typing import Optional, Union
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -22,7 +22,7 @@ from app.models.sale_item import SaleItem
 from app.models.user import User
 from app.schemas.mpesa import StkPushRequest, StkPushResponse, StkStatusResponse
 from app.schemas.sale import SaleItemResponse, SaleReceiptResponse
-from app.services.mpesa import MpesaError, initiate_stk_push, parse_stk_callback, resolve_credentials
+from app.services.mpesa import parse_stk_callback, seller_payment_destination
 from app.utils.receipt_generator import generate_receipt_html
 from app.api.sales import generate_receipt_number
 
@@ -41,38 +41,6 @@ def _callback_url() -> str:
             detail="Set MPESA_CALLBACK_BASE_URL (public URL) so Safaricom can reach the callback.",
         )
     return f"{base}/api/v1/payments/mpesa/callback"
-
-
-def _validate_cart(db: Session, business_id: UUID, items: list) -> Tuple[List[dict], Decimal]:
-    cart: List[dict] = []
-    total = Decimal("0.00")
-    for item in items:
-        product = db.query(Product).filter(
-            Product.id == item.product_id,
-            Product.business_id == business_id,
-            Product.is_active == True,  # noqa: E712
-        ).first()
-        if not product:
-            raise HTTPException(status_code=404, detail=f"Product {item.product_id} not found")
-        if product.stock_quantity < item.quantity:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Insufficient stock for {product.name}. Available: {product.stock_quantity}",
-            )
-        unit_price = _money(product.selling_price)
-        subtotal = _money(unit_price * item.quantity)
-        total += subtotal
-        cart.append(
-            {
-                "product_id": str(product.id),
-                "name": product.name,
-                "sku": product.sku,
-                "quantity": item.quantity,
-                "unit_price": str(unit_price),
-                "subtotal": str(subtotal),
-            }
-        )
-    return cart, _money(total)
 
 
 def _complete_sale_from_payment(
@@ -177,22 +145,17 @@ def mpesa_collection_mode(
     current_user: User = Depends(get_pos_user),
     _access: Business = Depends(require_feature("pos")),
 ):
-    """Tell the POS whether this shop uses till, paybill, or send-money."""
-    payment = (business.settings or {}).get("payment") or {}
-    account_type = str(payment.get("mpesa_account_type") or "paybill").strip().lower()
-    if account_type not in {"paybill", "till", "send_money"}:
-        account_type = "paybill"
-    send_phone = (payment.get("mpesa_send_money_phone") or business.phone or "").strip()
-    try:
-        resolve_credentials(business.settings or {})
-        stk_available = True
-    except MpesaError:
-        stk_available = False
+    """Tell the POS how this shop collects M-Pesa. Daraja is not involved."""
+    destination = seller_payment_destination(business.settings or {}, business.phone or "")
     return {
-        "account_type": account_type,
-        "send_money_phone": send_phone,
-        "stk_available": stk_available,
-        "mpesa_enabled": payment.get("mpesa_enabled", True) is not False,
+        "account_type": destination["account_type"],
+        "send_money_phone": destination["send_money_phone"],
+        "shortcode": destination["shortcode"],
+        "account_number": destination["account_number"],
+        "configured": destination["configured"],
+        "stk_available": False,
+        "collection_mode": "manual",
+        "mpesa_enabled": destination["mpesa_enabled"],
     }
 
 
@@ -204,66 +167,18 @@ async def stk_push(
     business: Business = Depends(get_current_business),
     _access: Business = Depends(require_feature("pos")),
 ):
-    """Start an M-Pesa STK Push for the current POS cart."""
-    payment_settings = (business.settings or {}).get("payment") or {}
-    if payment_settings.get("mpesa_enabled") is False:
-        raise HTTPException(status_code=400, detail="M-Pesa is disabled for this business")
+    """
+    Seller checkout does not use STK Push.
 
-    try:
-        credentials = resolve_credentials(business.settings or {})
-    except MpesaError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    cart_items, total = _validate_cart(db, business.id, payload.items)
-    amount_int = int(total.to_integral_value(rounding=ROUND_HALF_UP))
-    if amount_int < 1:
-        raise HTTPException(status_code=400, detail="Sale total must be at least KES 1")
-
-    payment = MpesaTransaction(
-        business_id=business.id,
-        user_id=current_user.id,
-        phone_number=payload.phone_number,
-        amount=total,
-        account_reference=business.name[:12] or "DukaYetu",
-        description="POS Payment",
-        status="PENDING",
-        source="POS",
-        cart_snapshot={"items": cart_items},
-    )
-    db.add(payment)
-    db.commit()
-    db.refresh(payment)
-
-    try:
-        result = await initiate_stk_push(
-            credentials=credentials,
-            phone_number=payload.phone_number,
-            amount=amount_int,
-            account_reference=payment.account_reference,
-            transaction_desc="POS Payment",
-            callback_url=_callback_url(),
-        )
-    except MpesaError as exc:
-        payment.status = "FAILED"
-        payment.result_desc = str(exc)
-        payment.callback_payload = {"error": str(exc), "details": getattr(exc, "details", None)}
-        db.commit()
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    payment.phone_number = result["phone_number"]
-    payment.merchant_request_id = result.get("merchant_request_id")
-    payment.checkout_request_id = result.get("checkout_request_id")
-    payment.result_desc = result.get("customer_message") or result.get("response_description")
-    db.commit()
-
-    return StkPushResponse(
-        payment_id=str(payment.id),
-        checkout_request_id=payment.checkout_request_id,
-        merchant_request_id=payment.merchant_request_id,
-        phone_number=payment.phone_number,
-        amount=payment.amount,
-        status=payment.status,
-        customer_message=payment.result_desc or "Check your phone to enter M-Pesa PIN",
+    A Daraja prompt can only credit the shortcode that owns the passkey.
+    Shops collect on their own Paybill, Till, or phone, then mark the sale paid.
+    """
+    raise HTTPException(
+        status_code=400,
+        detail=(
+            "Customer payments are confirmed manually. Show the Paybill, Till, or "
+            "Send Money instructions, wait for the M-Pesa message, then mark the sale as paid."
+        ),
     )
 
 

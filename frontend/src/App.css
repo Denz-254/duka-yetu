@@ -2593,6 +2593,16 @@
 }
 
 @media (max-width: 640px) {
+  .checkout-shell {
+    padding: 16px 12px 40px;
+  }
+
+  .checkout-account,
+  .checkout-item__name,
+  .checkout-toolbar {
+    overflow-wrap: anywhere;
+  }
+
   .top-banner {
     padding: 0 12px;
   }

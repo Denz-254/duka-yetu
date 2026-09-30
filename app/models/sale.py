@@ -19,6 +19,7 @@ class Sale(Base):
     total_amount = Column(Numeric(10, 2), nullable=False)
     payment_method = Column(String(50), default="CASH", nullable=False)
     payment_status = Column(String(50), default="PAID", nullable=False)
+    mpesa_receipt_number = Column(String(50))
     sale_date = Column(DateTime, default=datetime.utcnow, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     

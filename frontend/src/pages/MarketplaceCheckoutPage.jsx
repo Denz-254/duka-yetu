@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import {
   FaArrowLeft,
@@ -18,7 +18,6 @@ import useAuthStore from '../store/authStore';
 import { formatCurrency, downloadBlob } from '../utils/helpers';
 import Seo from '../components/common/Seo';
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const shortErr = (e) => {
   const d = e?.response?.data?.detail || e?.message || 'Checkout failed';
   return typeof d === 'string' ? (d.length > 48 ? `${d.slice(0, 47)}…` : d) : 'Checkout failed';
@@ -40,13 +39,35 @@ const MarketplaceCheckoutPage = () => {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('');
   const [orderResult, setOrderResult] = useState(null);
+  const [pendingOrder, setPendingOrder] = useState(null);
+  const sellers = [...new Set(items.map((item) => item.business_id))];
 
-  // Must register / login as shopper (or any user) before paying online
+  useEffect(() => {
+    if (!pendingOrder?.order_id || orderResult) return undefined;
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const { data: order } = await api.get(`/marketplace/orders/${pendingOrder.order_id}`);
+        if (cancelled) return;
+        if (order.payment_status === 'PAID') {
+          setOrderResult({ ...order, order_id: order.order_id || pendingOrder.order_id });
+          setPendingOrder(null);
+          toast.success('Seller confirmed the payment');
+        }
+      } catch {
+        // Keep the payment instructions on screen.
+      }
+    };
+    const timer = setInterval(poll, 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [pendingOrder, orderResult]);
+
   if (!isAuthenticated) {
     return <Navigate to="/shop/register" replace state={{ from: '/shop/checkout' }} />;
   }
-
-  const sellers = [...new Set(items.map((item) => item.business_id))];
 
   const downloadInvoice = async () => {
     if (!orderResult?.order_id) return;
@@ -73,7 +94,7 @@ const MarketplaceCheckoutPage = () => {
     }
 
     setLoading(true);
-    setStatus('Sending STK Push...');
+    setStatus('Creating your order...');
     try {
       const { data } = await api.post('/marketplace/checkout', {
         ...form,
@@ -86,24 +107,10 @@ const MarketplaceCheckoutPage = () => {
         items: items.map((item) => ({ product_id: item.id, quantity: item.quantity })),
       }, { timeout: 45000 });
 
-      toast.success('Check phone for PIN');
-      setStatus('Waiting for M-Pesa PIN...');
-
-      for (let i = 0; i < 40; i += 1) {
-        const { data: order } = await api.get(`/marketplace/orders/${data.order_id}`);
-        if (order.payment_status === 'PAID') {
-          setOrderResult(order);
-          clearCart();
-          setStatus('');
-          toast.success('Payment successful');
-          return;
-        }
-        if (order.payment_status === 'FAILED') {
-          throw new Error('Payment cancelled');
-        }
-        await sleep(3000);
-      }
-      throw new Error('Payment timed out');
+      clearCart();
+      setPendingOrder(data);
+      setStatus('');
+      toast.success('Pay with the M-Pesa steps below');
     } catch (error) {
       toast.error(shortErr(error));
       setStatus('');
@@ -111,6 +118,34 @@ const MarketplaceCheckoutPage = () => {
       setLoading(false);
     }
   };
+
+  if (pendingOrder) {
+    const steps = pendingOrder.payment_instructions?.steps || [];
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-8">
+        <Seo title="Pay with M-Pesa | DukaMall" path="/shop/checkout" noIndex />
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 sm:p-8 max-w-md w-full">
+          <h1 className="text-2xl font-bold text-gray-800">Pay with M-Pesa</h1>
+          <p className="text-gray-600 mt-2">{pendingOrder.order_number}</p>
+          <p className="text-gray-800 font-bold mt-3">{formatCurrency(pendingOrder.amount)}</p>
+          <p className="text-sm text-gray-500 mt-3">
+            {pendingOrder.customer_message}
+          </p>
+          <ol className="list-decimal pl-5 mt-4 space-y-2 text-sm text-gray-800">
+            {steps.map((step) => (
+              <li key={step}>{step}</li>
+            ))}
+          </ol>
+          <p className="text-xs text-gray-500 mt-4">
+            This page updates when the shop marks the order paid after the M-Pesa message arrives.
+          </p>
+          <Link to="/shop" className="mt-6 inline-flex w-full items-center justify-center px-4 py-2 rounded-md bg-orange-500 text-white font-semibold text-sm">
+            Back to shop
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   if (orderResult) {
     return (
@@ -314,7 +349,7 @@ const MarketplaceCheckoutPage = () => {
               className="checkout-pay"
             >
               <FaMobileAlt />
-              {loading ? 'Waiting for M-Pesa...' : 'Pay with M-Pesa'}
+              {loading ? 'Placing order...' : 'Show M-Pesa steps'}
             </button>
           </aside>
         </div>

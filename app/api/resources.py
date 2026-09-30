@@ -283,10 +283,13 @@ def update_business_profile(
 
 
 _PAYMENT_SECRET_KEYS = {
-    "mpesa_passkey",
     "stripe_secret_key",
 }
-_LEGACY_BUSINESS_MPESA_KEYS = {"mpesa_consumer_key", "mpesa_consumer_secret"}
+_LEGACY_BUSINESS_MPESA_KEYS = {
+    "mpesa_consumer_key",
+    "mpesa_consumer_secret",
+    "mpesa_passkey",
+}
 
 
 def _public_settings(section: str, values: dict) -> dict:
@@ -303,6 +306,7 @@ def _public_settings(section: str, values: dict) -> dict:
         data[f"{key}_set"] = bool(stored)
     for key in _LEGACY_BUSINESS_MPESA_KEYS:
         data.pop(key, None)
+    data.pop("mpesa_passkey_set", None)
     return data
 
 
@@ -310,6 +314,7 @@ def _merge_payment_settings(existing: dict, incoming: dict) -> dict:
     merged = {**(existing or {}), **(incoming or {})}
     for key in _LEGACY_BUSINESS_MPESA_KEYS:
         merged.pop(key, None)
+    merged.pop("mpesa_passkey_set", None)
     for key in _PAYMENT_SECRET_KEYS:
         value = incoming.get(key) if incoming else None
         # Keep previous secret when UI sends blank / masked placeholder.
@@ -323,6 +328,56 @@ def _merge_payment_settings(existing: dict, incoming: dict) -> dict:
     if "mpesa_account_type" in merged:
         account_type = str(merged["mpesa_account_type"]).lower()
         merged["mpesa_account_type"] = account_type if account_type in {"paybill", "till", "send_money"} else "paybill"
+    return _normalize_seller_mpesa(merged)
+
+
+def _normalize_seller_mpesa(merged: dict) -> dict:
+    """Sellers store a Paybill, Till, or phone. Daraja secrets are rejected."""
+    import re
+
+    from app.services.mpesa import MpesaError, display_phone, normalize_phone
+
+    account_type = str(merged.get("mpesa_account_type") or "paybill").lower()
+    if account_type not in {"paybill", "till", "send_money"}:
+        account_type = "paybill"
+    merged["mpesa_account_type"] = account_type
+
+    shortcode = re.sub(r"\D", "", str(merged.get("mpesa_shortcode") or ""))
+    account_number = re.sub(r"\s+", "", str(merged.get("mpesa_account_number") or ""))[:20]
+    if account_number and not re.fullmatch(r"[A-Za-z0-9-]{1,20}", account_number):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Paybill account number can only use letters, numbers, and dashes.",
+        )
+    merged["mpesa_account_number"] = account_number
+    merged["mpesa_shortcode"] = shortcode
+
+    raw_phone = str(merged.get("mpesa_send_money_phone") or "").strip()
+    if raw_phone:
+        try:
+            merged["mpesa_send_money_phone"] = display_phone(normalize_phone(raw_phone))
+        except MpesaError as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    else:
+        merged["mpesa_send_money_phone"] = ""
+
+    if merged.get("mpesa_enabled") is False:
+        return merged
+
+    if account_type == "send_money":
+        if not merged["mpesa_send_money_phone"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Enter the M-Pesa phone that should receive Send Money. No Daraja account is required.",
+            )
+        return merged
+
+    if not re.fullmatch(r"\d{5,8}", shortcode):
+        label = "Till number" if account_type == "till" else "Paybill number"
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Enter a {label} with 5 to 8 digits. Sellers do not need Daraja credentials.",
+        )
     return merged
 
 
@@ -349,7 +404,7 @@ def update_business_settings(
     existing_section = dict(current.get(payload.section) or {})
 
     if payload.section == "payment":
-        # Gateway API credentials are environment-only; the M-Pesa passkey is business-specific.
+        # Card secrets stay in the environment. Seller M-Pesa is a Paybill, Till, or phone.
         if payload.values.get("stripe_secret_key"):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

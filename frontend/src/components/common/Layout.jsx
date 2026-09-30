@@ -98,7 +98,7 @@ const Layout = () => {
       <main
         className={`transition-all duration-300 min-h-screen ${
           sidebarOpen ? 'md:ml-[280px]' : 'md:ml-[80px]'
-        } ml-0`}
+        } ml-0 overflow-x-clip`}
       >
         <div className="p-4 pt-16 md:p-6 md:pt-6">
           <Outlet />

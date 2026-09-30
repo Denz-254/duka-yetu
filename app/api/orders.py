@@ -1,5 +1,6 @@
 """Business online order management."""
 
+import re
 from datetime import datetime
 from typing import List, Optional
 from uuid import UUID
@@ -13,8 +14,9 @@ from app.core.database import get_db
 from app.core.dependencies import get_current_business, get_current_user
 from app.models.business import Business
 from app.models.online_order import Notification, OnlineOrder
+from app.models.product import Product
 from app.models.user import User
-from app.services.email import send_order_delivered_emails
+from app.services.email import send_order_delivered_emails, send_order_paid_emails
 from app.utils.invoice_generator import generate_order_invoice_pdf, pdf_attachment
 
 router = APIRouter()
@@ -34,6 +36,7 @@ class OrderItemOut(BaseModel):
     payment_status: str
     fulfillment_status: str
     mpesa_receipt_number: Optional[str] = None
+    payment_details: dict = {}
     created_at: datetime
     paid_at: Optional[datetime] = None
     delivered_at: Optional[datetime] = None
@@ -41,6 +44,10 @@ class OrderItemOut(BaseModel):
 
 class FulfillmentUpdate(BaseModel):
     fulfillment_status: str = Field(..., pattern="^(PENDING|PROCESSING|DELIVERED|CANCELLED)$")
+
+
+class MarkPaidRequest(BaseModel):
+    mpesa_receipt_number: Optional[str] = Field(None, max_length=20)
 
 
 class NotificationOut(BaseModel):
@@ -68,6 +75,7 @@ def _order_out(order: OnlineOrder) -> OrderItemOut:
         payment_status=order.payment_status,
         fulfillment_status=order.fulfillment_status,
         mpesa_receipt_number=order.mpesa_receipt_number,
+        payment_details=order.payment_details or {},
         created_at=order.created_at,
         paid_at=order.paid_at,
         delivered_at=order.delivered_at,
@@ -168,5 +176,77 @@ async def update_fulfillment(
             await send_order_delivered_emails(order, business)
         except Exception:  # noqa: BLE001
             pass
+
+    return _order_out(order)
+
+
+@router.post("/{order_id}/mark-paid", response_model=OrderItemOut)
+async def mark_order_paid(
+    order_id: UUID,
+    payload: MarkPaidRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+    business: Business = Depends(get_current_business),
+):
+    """Confirm an online order after the Paybill, Till, or Send Money message arrives."""
+    order = db.query(OnlineOrder).filter(
+        OnlineOrder.id == order_id,
+        OnlineOrder.business_id == business.id,
+    ).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    if order.payment_status == "PAID":
+        return _order_out(order)
+    if order.fulfillment_status == "CANCELLED":
+        raise HTTPException(status_code=400, detail="This order was cancelled")
+    if order.payment_status not in {"PENDING", "FAILED"}:
+        raise HTTPException(status_code=400, detail="This order cannot be marked as paid")
+
+    receipt = (payload.mpesa_receipt_number or "").strip().upper()
+    if receipt and not re.fullmatch(r"[A-Z0-9]{6,20}", receipt):
+        raise HTTPException(
+            status_code=400,
+            detail="M-Pesa confirmation code should be 6 to 20 letters and numbers.",
+        )
+
+    for item in order.items or []:
+        product = db.query(Product).filter(
+            Product.id == item["product_id"],
+            Product.business_id == order.business_id,
+        ).first()
+        if not product:
+            raise HTTPException(status_code=404, detail=f"Product {item.get('name')} is no longer available")
+        qty = int(item["quantity"])
+        if product.stock_quantity < qty:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Insufficient stock for {product.name}. Available: {product.stock_quantity}",
+            )
+        product.stock_quantity -= qty
+
+    order.payment_status = "PAID"
+    order.fulfillment_status = "PROCESSING"
+    order.paid_at = datetime.utcnow()
+    if receipt:
+        order.mpesa_receipt_number = receipt
+
+    db.add(
+        Notification(
+            audience="BUSINESS",
+            business_id=order.business_id,
+            title="Online order confirmed",
+            message=f"Order {order.order_number} was marked paid after the M-Pesa message.",
+            type="ORDER",
+            data={"order_id": str(order.id), "order_number": order.order_number},
+            is_read=0,
+        )
+    )
+    db.commit()
+    db.refresh(order)
+
+    try:
+        await send_order_paid_emails(order, business)
+    except Exception:  # noqa: BLE001
+        pass
 
     return _order_out(order)

@@ -9,7 +9,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from typing import List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import desc, or_
 from sqlalchemy.orm import Session
@@ -17,11 +17,10 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.business import Business
-from app.models.mpesa_transaction import MpesaTransaction
 from app.models.online_order import OnlineOrder
 from app.models.product import Product
 from app.models.resources import Category
-from app.services.mpesa import MpesaError, initiate_stk_push, resolve_credentials
+from app.services.mpesa import MpesaError, build_payment_instructions, seller_payment_destination
 
 router = APIRouter()
 
@@ -227,6 +226,7 @@ class MarketplaceCheckoutResponse(BaseModel):
     commission_amount: Decimal
     status: str
     customer_message: str
+    payment_instructions: dict = {}
 
 
 class OrderStatusResponse(BaseModel):
@@ -237,6 +237,7 @@ class OrderStatusResponse(BaseModel):
     total_amount: Decimal
     mpesa_receipt_number: Optional[str] = None
     business_name: Optional[str] = None
+    payment_instructions: dict = {}
 
 
 @router.get("/products/{product_id}", response_model=MarketProduct)
@@ -308,19 +309,10 @@ async def marketplace_checkout(payload: MarketplaceCheckoutRequest, db: Session 
         )
 
     business = db.query(Business).filter(Business.id == business_id).first()
-    payment_settings = (business.settings or {}).get("payment") or {}
-    if payment_settings.get("mpesa_enabled") is False:
-        raise HTTPException(status_code=400, detail="M-Pesa is disabled for this seller")
-    try:
-        credentials = resolve_credentials(business.settings or {})
-    except MpesaError as exc:
-        raise HTTPException(status_code=400, detail=f"Seller M-Pesa not configured: {exc}") from exc
-
     commission_percent = _money(settings.MARKETPLACE_COMMISSION_PERCENT)
     commission_amount = _money(subtotal * commission_percent / Decimal("100"))
     business_payout = _money(subtotal - commission_amount)
     total = _money(subtotal)
-    amount_int = int(total.to_integral_value(rounding=ROUND_HALF_UP))
 
     order = OnlineOrder(
         business_id=business_id,
@@ -342,58 +334,30 @@ async def marketplace_checkout(payload: MarketplaceCheckoutRequest, db: Session 
     db.add(order)
     db.flush()
 
-    payment = MpesaTransaction(
-        business_id=business_id,
-        user_id=None,
-        phone_number=payload.customer_phone,
-        amount=total,
-        account_reference=order.order_number[:12],
-        description="Online Order",
-        status="PENDING",
-        source="MARKETPLACE",
-        cart_snapshot={"order_id": str(order.id), "items": cart_items},
-    )
-    db.add(payment)
-    db.commit()
-    db.refresh(order)
-    db.refresh(payment)
-
-    base = (settings.MPESA_CALLBACK_BASE_URL or settings.API_BASE_URL or "").rstrip("/")
-    if not base:
-        raise HTTPException(status_code=500, detail="MPESA_CALLBACK_BASE_URL is not configured")
-
+    destination = seller_payment_destination(business.settings or {}, business.phone or "")
     try:
-        result = await initiate_stk_push(
-            credentials=credentials,
-            phone_number=payload.customer_phone,
-            amount=amount_int,
-            account_reference=order.order_number[:12],
-            transaction_desc="Online Order",
-            callback_url=f"{base}/api/v1/payments/mpesa/callback",
-        )
+        instructions = build_payment_instructions(destination, f"{total:.2f}", order.order_number)
     except MpesaError as exc:
-        payment.status = "FAILED"
-        payment.result_desc = str(exc)
-        order.payment_status = "FAILED"
-        db.commit()
+        db.rollback()
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    payment.phone_number = result["phone_number"]
-    payment.merchant_request_id = result.get("merchant_request_id")
-    payment.checkout_request_id = result.get("checkout_request_id")
-    payment.result_desc = result.get("customer_message")
-    order.mpesa_checkout_request_id = payment.checkout_request_id
-    order.customer_phone = payment.phone_number
+    if destination["account_type"] == "send_money":
+        order.payment_method = "SEND_MONEY"
+    order.payment_details = instructions
     db.commit()
+    db.refresh(order)
 
     return MarketplaceCheckoutResponse(
         order_id=str(order.id),
         order_number=order.order_number,
-        payment_id=str(payment.id),
+        payment_id=str(order.id),
         amount=order.total_amount,
         commission_amount=order.commission_amount,
         status="PENDING",
-        customer_message=payment.result_desc or "Check your phone to enter M-Pesa PIN",
+        customer_message=(
+            "Follow the M-Pesa steps. The shop confirms the order after the payment message arrives."
+        ),
+        payment_instructions=instructions,
     )
 
 
@@ -411,6 +375,7 @@ def get_public_order_status(order_id: UUID, db: Session = Depends(get_db)):
         total_amount=order.total_amount,
         mpesa_receipt_number=order.mpesa_receipt_number,
         business_name=business.name if business else None,
+        payment_instructions=order.payment_details or {},
     )
 
 

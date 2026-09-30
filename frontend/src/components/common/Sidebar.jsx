@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -40,10 +40,16 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
   const clearSubscription = useSubscriptionStore((state) => state.clear);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [inventoryOpen, setInventoryOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
 
-  const isMobileView = () => typeof window !== 'undefined' && window.innerWidth < 768;
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
   const closeOnMobile = () => {
-    if (isMobileView()) toggleSidebar();
+    if (isMobile) toggleSidebar();
   };
 
   const navItems = [
@@ -94,11 +100,11 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
     <motion.div
       initial={{ width: 280, x: 0 }}
       animate={{
-        width: isOpen ? 280 : 80,
-        x: isMobileView() ? (isOpen ? 0 : -320) : 0,
+        width: isMobile ? Math.min(300, window.innerWidth - 48) : (isOpen ? 280 : 80),
+        x: isMobile ? (isOpen ? 0 : -360) : 0,
       }}
       transition={{ duration: 0.3, ease: 'easeInOut' }}
-      className={`fixed left-0 top-0 h-full bg-gradient-to-b from-primary-800 to-primary-900 shadow-xl z-50 overflow-hidden ${isMobileView() && !isOpen ? 'pointer-events-none' : 'pointer-events-auto'}`}
+      className={`fixed left-0 top-0 h-full bg-gradient-to-b from-primary-800 to-primary-900 shadow-xl z-50 overflow-hidden ${isMobile && !isOpen ? 'pointer-events-none' : 'pointer-events-auto'}`}
     >
       {/* Logo */}
       <div className="flex items-center justify-between h-16 px-4 border-b border-primary-700/30">
@@ -146,7 +152,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
       </div>
 
       {/* Navigation */}
-      <div className="flex-1 overflow-y-auto py-4 px-3 h-[calc(100vh-200px)] scrollbar-thin scrollbar-thumb-primary-600 scrollbar-track-transparent">
+      <div className="flex-1 overflow-y-auto py-4 px-3 pb-24 h-[calc(100vh-180px)] scrollbar-thin scrollbar-thumb-primary-600 scrollbar-track-transparent">
         {/* Main Nav Items */}
         {navItems.filter(canAccess).map((item) => {
           const Icon = item.icon;

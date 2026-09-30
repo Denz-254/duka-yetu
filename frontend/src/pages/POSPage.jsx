@@ -12,10 +12,9 @@ import useAuthStore from '../store/authStore';
 import api from '../api/client';
 import { payments, shifts } from '../api/endpoints';
 import { formatCurrency } from '../utils/helpers';
+import { mpesaSteps } from '../utils/mpesaInstructions';
 import ProductCard from '../components/products/ProductCard';
 import ShiftClock from '../components/shifts/ShiftClock';
-
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const POSPage = () => {
   const [products, setProducts] = useState([]);
@@ -24,9 +23,15 @@ const POSPage = () => {
   const [showReceipt, setShowReceipt] = useState(false);
   const [receiptData, setReceiptData] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState('CASH');
-  const [mpesaPhone, setMpesaPhone] = useState('');
-  const [mpesaStatus, setMpesaStatus] = useState('');
-  const [mpesaMode, setMpesaMode] = useState({ account_type: 'paybill', send_money_phone: '', stk_available: true });
+  const [mpesaReceipt, setMpesaReceipt] = useState('');
+  const [mpesaMode, setMpesaMode] = useState({
+    account_type: 'paybill',
+    send_money_phone: '',
+    shortcode: '',
+    account_number: '',
+    configured: false,
+    mpesa_enabled: true,
+  });
   const [shift, setShift] = useState(undefined);
   const [shiftRefresh, setShiftRefresh] = useState(0);
   const { items, total, addItem, removeItem, updateQuantity, clearCart } = useCartStore();
@@ -43,6 +48,13 @@ const POSPage = () => {
       .catch(() => {});
     return undefined;
   }, [user?.role]);
+
+  useEffect(() => {
+    setPaymentMethod((current) => {
+      if (current !== 'MPESA' && current !== 'SEND_MONEY') return current;
+      return mpesaMode.account_type === 'send_money' ? 'SEND_MONEY' : 'MPESA';
+    });
+  }, [mpesaMode.account_type]);
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -61,22 +73,8 @@ const POSPage = () => {
     product.sku.toLowerCase().includes(search.toLowerCase())
   );
 
-  const waitForMpesaPayment = async (paymentId) => {
-    // Poll until Safaricom callback completes the sale (or fails / times out).
-    for (let attempt = 0; attempt < 40; attempt += 1) {
-      const { data } = await payments.mpesaStatus(paymentId);
-      setMpesaStatus(data.status);
-      if (data.status === 'COMPLETED' && data.sale) {
-        return data.sale;
-      }
-      if (data.status === 'FAILED') {
-        throw new Error(data.result_desc || 'M-Pesa payment failed or was cancelled');
-      }
-      setMpesaStatus('Waiting for customer to enter M-Pesa PIN...');
-      await sleep(3000);
-    }
-    throw new Error('Timed out waiting for M-Pesa confirmation. Ask the customer to retry.');
-  };
+  const mobileMethod = mpesaMode.account_type === 'send_money' ? 'SEND_MONEY' : 'MPESA';
+  const payingWithMpesa = paymentMethod === 'MPESA' || paymentMethod === 'SEND_MONEY';
 
   const handleCheckout = async () => {
     if (items.length === 0) {
@@ -84,60 +82,33 @@ const POSPage = () => {
       return;
     }
 
-    if (paymentMethod === 'MPESA') {
-      if (!mpesaPhone.trim()) {
-        toast.error('Enter the customer M-Pesa phone number');
-        return;
-      }
-    }
-
-    if (paymentMethod === 'SEND_MONEY' && !mpesaMode.send_money_phone) {
-      toast.error('Set a Send Money number in Payment Settings');
+    if (payingWithMpesa && !mpesaMode.configured) {
+      toast.error('Set a Paybill, Till, or Send Money number in Payment Settings');
       return;
     }
 
     setLoading(true);
-    setMpesaStatus('');
     try {
       const cartItems = items.map((item) => ({
         product_id: item.id,
         quantity: item.quantity,
       }));
 
-      if (paymentMethod === 'MPESA') {
-        setMpesaStatus('Sending STK Push...');
-        const { data: push } = await payments.mpesaStkPush({
-          items: cartItems,
-          phone_number: mpesaPhone.trim(),
-        });
-        toast.success(push.customer_message || 'STK Push sent. Enter PIN on phone.');
-        setMpesaStatus(push.customer_message || 'Check your phone...');
-        const sale = await waitForMpesaPayment(push.payment_id);
-        setReceiptData(sale);
-        setShowReceipt(true);
-        clearCart();
-        setMpesaPhone('');
-        setMpesaStatus('');
-        toast.success('M-Pesa payment successful!');
-        fetchProducts();
-        setShiftRefresh((n) => n + 1);
-        return;
-      }
-
       const response = await api.post('/sales/', {
         items: cartItems,
-        payment_method: paymentMethod,
+        payment_method: payingWithMpesa ? mobileMethod : paymentMethod,
+        mpesa_receipt_number: payingWithMpesa ? mpesaReceipt.trim() : undefined,
       });
       setReceiptData(response.data);
       setShowReceipt(true);
       clearCart();
-      toast.success('Sale completed successfully!');
+      setMpesaReceipt('');
+      toast.success(payingWithMpesa ? 'Marked as paid' : 'Sale completed successfully!');
       fetchProducts();
       setShiftRefresh((n) => n + 1);
     } catch (error) {
       const message = error.response?.data?.detail || error.message || 'Sale failed';
       toast.error(typeof message === 'string' ? message : 'Sale failed');
-      setMpesaStatus('');
     } finally {
       setLoading(false);
     }
@@ -145,11 +116,18 @@ const POSPage = () => {
 
   const paymentMethods = [
     { value: 'CASH', icon: FaMoneyBillWave, label: 'Cash' },
-    mpesaMode.account_type === 'send_money'
-      ? { value: 'SEND_MONEY', icon: FaMobileAlt, label: 'Send Money' }
-      : { value: 'MPESA', icon: FaMobileAlt, label: 'M-Pesa' },
+    {
+      value: mobileMethod,
+      icon: FaMobileAlt,
+      label: mpesaMode.account_type === 'till'
+        ? 'Till'
+        : mpesaMode.account_type === 'send_money'
+          ? 'Send Money'
+          : 'Paybill',
+    },
     { value: 'CARD', icon: FaCreditCard, label: 'Card' },
   ];
+  const mpesaGuide = mpesaSteps(mpesaMode, formatCurrency(total));
 
   if (user && user.role !== 'CASHIER') {
     return (
@@ -330,16 +308,13 @@ const POSPage = () => {
                 {/* Payment Method */}
                 <div className="mt-4 border-t border-gray-200 pt-4">
                   <label className="text-sm font-medium text-gray-700 block mb-2">Payment Method</label>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 min-[420px]:grid-cols-3 gap-2">
                     {paymentMethods.map((method) => {
                       const Icon = method.icon;
                       return (
                         <button
                           key={method.value}
-                          onClick={() => {
-                            setPaymentMethod(method.value);
-                            setMpesaStatus('');
-                          }}
+                          onClick={() => setPaymentMethod(method.value)}
                           className={`flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm transition-all duration-200 ${
                             paymentMethod === method.value
                               ? 'bg-primary-600 text-white'
@@ -354,35 +329,26 @@ const POSPage = () => {
                   </div>
                 </div>
 
-                {paymentMethod === 'MPESA' && (
+                {payingWithMpesa && (
                   <div className="mt-4 p-3 rounded-lg border border-green-100 bg-green-50 space-y-2">
+                    <p className="text-sm font-medium text-gray-800">Customer pays, then you confirm</p>
+                    <ol className="list-decimal pl-4 text-sm text-gray-700 space-y-1">
+                      {mpesaGuide.map((step) => (
+                        <li key={step}>{step}</li>
+                      ))}
+                    </ol>
                     <label className="text-sm font-medium text-gray-700 block">
-                      Customer M-Pesa Number
+                      M-Pesa code from the message (optional)
                     </label>
                     <input
-                      type="tel"
-                      value={mpesaPhone}
-                      onChange={(e) => setMpesaPhone(e.target.value)}
+                      type="text"
+                      value={mpesaReceipt}
+                      onChange={(e) => setMpesaReceipt(e.target.value.toUpperCase())}
                       className="input-primary bg-white text-gray-800"
-                      placeholder="07XXXXXXXX or 2547XXXXXXXX"
+                      placeholder="e.g. QAB12CD3EF"
                       disabled={loading}
+                      autoComplete="off"
                     />
-                    <p className="text-xs text-gray-500">
-                      An STK Push prompt will be sent to this phone to enter the M-Pesa PIN.
-                    </p>
-                    {mpesaStatus && (
-                      <p className="text-xs font-medium text-green-700">{mpesaStatus}</p>
-                    )}
-                  </div>
-                )}
-
-                {paymentMethod === 'SEND_MONEY' && (
-                  <div className="mt-4 p-3 rounded-lg border border-green-100 bg-green-50 space-y-2">
-                    <p className="text-sm font-medium text-gray-800">Ask the customer to send money to</p>
-                    <p className="text-lg font-bold text-green-800">{mpesaMode.send_money_phone || 'Not configured'}</p>
-                    <p className="text-xs text-gray-500">
-                      Confirm only after the M-Pesa SMS arrives. Total: {formatCurrency(total)}
-                    </p>
                   </div>
                 )}
 
@@ -400,12 +366,12 @@ const POSPage = () => {
                     {loading ? (
                       <span className="flex items-center gap-2">
                         <FaMobileAlt className="animate-pulse" />
-                        {paymentMethod === 'MPESA' ? 'Waiting for M-Pesa...' : 'Processing...'}
+                        Processing...
                       </span>
                     ) : (
                       <>
                         <FaReceipt />
-                        {paymentMethod === 'MPESA' ? 'Pay with M-Pesa' : paymentMethod === 'SEND_MONEY' ? 'Confirm Send Money' : 'Complete Sale'}
+                        {payingWithMpesa ? 'Mark as paid' : 'Complete Sale'}
                       </>
                     )}
                   </button>

@@ -63,6 +63,7 @@ def generate_receipt_html(sale: Sale, db: Session) -> str:
         <div style="text-align: right;">
             <p><strong>Total: KES {sale.total_amount:.2f}</strong></p>
             <p>Payment: {sale.payment_method}</p>
+            {f'<p>M-Pesa code: {sale.mpesa_receipt_number}</p>' if getattr(sale, 'mpesa_receipt_number', None) else ''}
             <p>Status: {sale.payment_status}</p>
         </div>
         

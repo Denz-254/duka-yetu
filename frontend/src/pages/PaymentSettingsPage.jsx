@@ -11,9 +11,8 @@ const defaultSettings = {
   bank_enabled: false,
   mpesa_account_type: 'paybill',
   mpesa_shortcode: '',
+  mpesa_account_number: '',
   mpesa_send_money_phone: '',
-  mpesa_passkey: '',
-  mpesa_passkey_set: false,
   card_processor: 'stripe',
   stripe_publishable_key: '',
   currency: 'KES',
@@ -65,6 +64,7 @@ const PaymentSettingsPage = () => {
         bank_enabled: settings.bank_enabled,
         mpesa_account_type: settings.mpesa_account_type,
         mpesa_shortcode: settings.mpesa_shortcode,
+        mpesa_account_number: settings.mpesa_account_number,
         mpesa_send_money_phone: settings.mpesa_send_money_phone,
         card_processor: settings.card_processor,
         stripe_publishable_key: settings.stripe_publishable_key,
@@ -72,15 +72,10 @@ const PaymentSettingsPage = () => {
         tax_rate: settings.tax_rate,
       };
 
-      if (settings.mpesa_passkey?.trim()) {
-        payload.mpesa_passkey = settings.mpesa_passkey.trim();
-      }
-
       const { data } = await business.updateSettings('payment', payload);
       setSettings((current) => ({
         ...current,
         ...data,
-        mpesa_passkey: '',
       }));
       toast.success('Payment settings saved successfully');
     } catch (error) {
@@ -131,7 +126,7 @@ const PaymentSettingsPage = () => {
             Payment Settings
           </h1>
           <p className="text-gray-500 text-sm mt-1">
-            Configure payment methods and the business M-Pesa destination for STK Push
+            Choose how customers pay you. You do not need a Safaricom Daraja account.
           </p>
         </div>
         <button
@@ -168,7 +163,7 @@ const PaymentSettingsPage = () => {
                   <FaMobileAlt className="text-green-600 text-xl" />
                   <div>
                     <p className="font-medium text-gray-800">M-Pesa</p>
-                    <p className="text-sm text-gray-500">STK Push mobile money</p>
+                    <p className="text-sm text-gray-500">Paybill, Till, or Send Money</p>
                   </div>
                 </div>
                 <button type="button" onClick={() => handleToggle('mpesa_enabled')} className="text-2xl text-gray-400 hover:text-primary-600 transition-colors">
@@ -204,19 +199,22 @@ const PaymentSettingsPage = () => {
 
           {settings.mpesa_enabled && (
             <div className="border-t border-gray-100 pt-4">
-              <h3 className="font-semibold text-gray-800 mb-2">M-Pesa / Daraja Configuration</h3>
+              <h3 className="font-semibold text-gray-800 mb-2">How customers pay you</h3>
+              <p className="text-sm text-gray-500 mb-4">
+                Money goes straight to your Paybill, Till, or phone. After the M-Pesa message arrives, mark the sale or order as paid. Daraja keys stay with the platform and are only used for subscriptions and featured products.
+              </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="label-primary">Account Type</label>
+                  <label className="label-primary">Collection method</label>
                   <select value={settings.mpesa_account_type} onChange={(e) => setSettings({ ...settings, mpesa_account_type: e.target.value })} className="input-primary bg-white text-gray-800">
                     <option value="paybill">Paybill</option>
-                    <option value="till">Till Number</option>
-                    <option value="send_money">Send Money (personal number)</option>
+                    <option value="till">Till number</option>
+                    <option value="send_money">Send Money</option>
                   </select>
                 </div>
                 {settings.mpesa_account_type === 'send_money' ? (
                   <div>
-                    <label className="label-primary">M-Pesa phone (Send Money)</label>
+                    <label className="label-primary">M-Pesa phone</label>
                     <input
                       type="tel"
                       value={settings.mpesa_send_money_phone}
@@ -226,21 +224,35 @@ const PaymentSettingsPage = () => {
                       required
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                      POS cashiers record this as a manual payment. STK Push and online checkout require a Paybill or Till.
+                      The customer sends money to this number. Wait for the SMS, then mark the payment as paid.
                     </p>
                   </div>
                 ) : (
                   <div>
-                    <label className="label-primary">{settings.mpesa_account_type === 'till' ? 'Till Number' : 'Paybill Number'}</label>
-                    <input type="text" value={settings.mpesa_shortcode} onChange={(e) => setSettings({ ...settings, mpesa_shortcode: e.target.value })} className="input-primary bg-white text-gray-800" required />
+                    <label className="label-primary">{settings.mpesa_account_type === 'till' ? 'Till number' : 'Paybill number'}</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={settings.mpesa_shortcode}
+                      onChange={(e) => setSettings({ ...settings, mpesa_shortcode: e.target.value })}
+                      className="input-primary bg-white text-gray-800"
+                      placeholder={settings.mpesa_account_type === 'till' ? 'e.g. 123456' : 'e.g. 400200'}
+                      required
+                    />
                   </div>
                 )}
-                {settings.mpesa_account_type !== 'send_money' && (
+                {settings.mpesa_account_type === 'paybill' && (
                   <div className="md:col-span-2">
-                    <label className="label-primary">Business STK Passkey {settings.mpesa_passkey_set ? '(saved)' : ''}</label>
-                    <input type="password" value={settings.mpesa_passkey} onChange={(e) => setSettings({ ...settings, mpesa_passkey: e.target.value })} className="input-primary bg-white text-gray-800" autoComplete="off" />
+                    <label className="label-primary">Account number</label>
+                    <input
+                      type="text"
+                      value={settings.mpesa_account_number}
+                      onChange={(e) => setSettings({ ...settings, mpesa_account_number: e.target.value })}
+                      className="input-primary bg-white text-gray-800"
+                      placeholder="Optional. Online orders use the order number if this is empty."
+                    />
                     <p className="text-xs text-gray-500 mt-1">
-                      The platform manages the shared Daraja consumer key and secret. Enter the passkey issued for this Paybill or Till.
+                      Customers type this as the Paybill account. Leave it empty and online orders will use the order number so you can match the message.
                     </p>
                   </div>
                 )}

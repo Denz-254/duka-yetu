@@ -36,51 +36,122 @@ def normalize_phone(phone: str) -> str:
     return digits
 
 
-def resolve_credentials(business_settings: dict) -> dict:
+def display_phone(phone: str) -> str:
+    """Show a Kenyan number as 07XXXXXXXX when possible."""
+    digits = re.sub(r"\D", "", phone or "")
+    if digits.startswith("254") and len(digits) == 12:
+        return "0" + digits[3:]
+    if digits.startswith("0") and len(digits) == 10:
+        return digits
+    if digits.startswith("7") and len(digits) == 9:
+        return "0" + digits
+    return (phone or "").strip()
+
+
+def seller_payment_destination(business_settings: dict, business_phone: str = "") -> dict:
     """
-    Resolve shared Daraja API credentials and the business STK destination.
+    Where a shop's customers send money.
+
+    Sellers never supply Daraja keys. They only choose a Paybill, a Till,
+    or a Send Money phone. The shop confirms payment after the M-Pesa
+    message arrives.
     """
     payment = (business_settings or {}).get("payment") or {}
-    consumer_key = (settings.MPESA_CONSUMER_KEY or "").strip()
-    consumer_secret = (settings.MPESA_CONSUMER_SECRET or "").strip()
-    passkey = (payment.get("mpesa_passkey") or "").strip()
-    shortcode = (payment.get("mpesa_shortcode") or "").strip()
-    account_type = (payment.get("mpesa_account_type") or "paybill").strip().lower()
-
+    account_type = str(payment.get("mpesa_account_type") or "paybill").strip().lower()
     if account_type not in {"paybill", "till", "send_money"}:
         account_type = "paybill"
 
-    if account_type == "send_money":
-        raise MpesaError(
-            "STK Push requires a business Paybill or Till. Send Money is available "
-            "only as a manual POS payment method."
-        )
+    shortcode = re.sub(r"\D", "", str(payment.get("mpesa_shortcode") or ""))
+    account_number = re.sub(r"\s+", "", str(payment.get("mpesa_account_number") or ""))[:20]
+    send_phone = display_phone(payment.get("mpesa_send_money_phone") or business_phone or "")
 
-    missing = [
-        name
-        for name, value in [
-            ("platform consumer key", consumer_key),
-            ("platform consumer secret", consumer_secret),
-            ("passkey", passkey),
-            ("shortcode", shortcode),
-        ]
-        if not value
-    ]
-    if missing:
-        raise MpesaError(
-            "M-Pesa is not configured. Add "
-            + ", ".join(missing)
-            + ". Set platform consumer credentials in the backend environment "
-            "and the business shortcode/passkey in Payment Settings."
-        )
+    if account_type == "send_money":
+        configured = bool(re.sub(r"\D", "", send_phone))
+    else:
+        configured = bool(re.fullmatch(r"\d{5,8}", shortcode))
 
     return {
-        "consumer_key": consumer_key,
-        "consumer_secret": consumer_secret,
-        "passkey": passkey,
-        "shortcode": shortcode,
         "account_type": account_type,
-        "environment": settings.MPESA_ENVIRONMENT,
+        "shortcode": shortcode,
+        "account_number": account_number,
+        "send_money_phone": send_phone,
+        "configured": configured,
+        "stk_available": False,
+        "collection_mode": "manual",
+        "mpesa_enabled": payment.get("mpesa_enabled", True) is not False,
+    }
+
+
+def build_payment_instructions(destination: dict, amount, reference: str) -> dict:
+    """Customer-facing steps for paying a seller directly."""
+    if destination.get("mpesa_enabled") is False:
+        raise MpesaError("M-Pesa is turned off for this shop")
+    if not destination.get("configured"):
+        raise MpesaError(
+            "This shop has not set up M-Pesa. Add a Paybill, Till, or Send Money "
+            "number in Payment Settings. A Daraja account is not required."
+        )
+
+    reference = re.sub(r"\s+", "", str(reference or "DUKA"))[:20] or "DUKA"
+    amount_label = f"KES {amount}"
+    account_type = destination["account_type"]
+
+    if account_type == "paybill":
+        account = destination["account_number"] or reference
+        steps = [
+            "Open the M-Pesa menu",
+            "Choose Lipa na M-Pesa, then Pay Bill",
+            f"Business number: {destination['shortcode']}",
+            f"Account number: {account}",
+            f"Amount: {amount_label}",
+            "Enter the M-Pesa PIN and send",
+            "The shop marks the order paid after the M-Pesa message arrives",
+        ]
+        title = "Paybill"
+        phone = ""
+        till = ""
+        paybill = destination["shortcode"]
+    elif account_type == "till":
+        account = ""
+        steps = [
+            "Open the M-Pesa menu",
+            "Choose Lipa na M-Pesa, then Buy Goods and Services",
+            f"Till number: {destination['shortcode']}",
+            f"Amount: {amount_label}",
+            "Enter the M-Pesa PIN and send",
+            "The shop marks the order paid after the M-Pesa message arrives",
+        ]
+        title = "Till number"
+        phone = ""
+        till = destination["shortcode"]
+        paybill = ""
+    else:
+        account = ""
+        phone = destination["send_money_phone"]
+        steps = [
+            "Open the M-Pesa menu",
+            "Choose Send Money",
+            f"Phone number: {phone}",
+            f"Amount: {amount_label}",
+            "Enter the M-Pesa PIN and send",
+            "Wait for the M-Pesa SMS. The shop then marks this payment as paid",
+        ]
+        title = "Send Money"
+        till = ""
+        paybill = ""
+
+    return {
+        "account_type": account_type,
+        "title": title,
+        "steps": steps,
+        "paybill": paybill,
+        "till": till,
+        "account_number": account,
+        "send_money_phone": phone,
+        "amount_label": amount_label,
+        "reference": reference,
+        "customer_message": steps[0] + ". " + " ".join(steps[1:5]),
+        "confirmation": "manual",
     }
 
 

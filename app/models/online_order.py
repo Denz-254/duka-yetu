@@ -35,6 +35,7 @@ class OnlineOrder(Base):
 
     mpesa_checkout_request_id = Column(String(100), index=True)
     mpesa_receipt_number = Column(String(50), index=True)
+    payment_details = Column(JSON, default=dict)
 
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

@@ -8,11 +8,14 @@ from uuid import UUID
 from datetime import datetime
 from decimal import Decimal
 import random
+import re
 import string
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_user, get_cashier_user
+from app.models.business import Business
 from app.models.user import User
+from app.services.mpesa import seller_payment_destination
 from app.models.product import Product
 from app.models.sale import Sale
 from app.models.sale_item import SaleItem
@@ -44,13 +47,36 @@ async def create_sale(
     Create a new sale (POS transaction).
     
     Only POS roles can create sales.
-    M-Pesa sales must go through /payments/mpesa/stk-push.
+    M-Pesa sales are marked paid after the shop sees the M-Pesa message.
     """
-    if sale_data.payment_method == "MPESA":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Use M-Pesa STK Push checkout for mobile money payments.",
+    receipt_code = (sale_data.mpesa_receipt_number or "").strip().upper()
+    if sale_data.payment_method in {"MPESA", "SEND_MONEY"}:
+        business = db.query(Business).filter(Business.id == current_user.business_id).first()
+        destination = seller_payment_destination(
+            (business.settings if business else None) or {},
+            business.phone if business else "",
         )
+        if not destination["mpesa_enabled"]:
+            raise HTTPException(status_code=400, detail="M-Pesa is turned off in Payment Settings")
+        if not destination["configured"]:
+            raise HTTPException(
+                status_code=400,
+                detail="Set a Paybill, Till, or Send Money number in Payment Settings.",
+            )
+        expected = "SEND_MONEY" if destination["account_type"] == "send_money" else "MPESA"
+        if sale_data.payment_method != expected:
+            label = destination["account_type"].replace("_", " ")
+            raise HTTPException(
+                status_code=400,
+                detail=f"This shop collects by {label}. Confirm the sale as {expected}.",
+            )
+        if receipt_code and not re.fullmatch(r"[A-Z0-9]{6,20}", receipt_code):
+            raise HTTPException(
+                status_code=400,
+                detail="M-Pesa confirmation code should be 6 to 20 letters and numbers.",
+            )
+    else:
+        receipt_code = ""
 
     # Validate products and calculate total
     items_data = []
@@ -101,6 +127,7 @@ async def create_sale(
         total_amount=total_amount,
         payment_method=sale_data.payment_method,
         payment_status="PAID",
+        mpesa_receipt_number=receipt_code or None,
         sale_date=datetime.utcnow(),
     )
     db.add(sale)
