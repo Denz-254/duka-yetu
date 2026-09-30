@@ -103,4 +103,5 @@ export const shifts = {
   open: (opening_cash) => api.post('/shifts/open', { opening_cash }),
   close: (data) => api.post('/shifts/close', data),
   list: (params) => api.get('/shifts/', { params }),
+  remove: (id) => api.delete(`/shifts/${id}`),
 };

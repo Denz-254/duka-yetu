@@ -14,9 +14,13 @@ from app.core.database import get_db
 from app.core.dependencies import require_super_admin
 from app.core.plans import PLAN_DEFINITIONS, normalize_plan
 from app.models.business import Business
+from app.models.cashier_shift import CashierShift
+from app.models.mpesa_transaction import MpesaTransaction
 from app.models.online_order import Notification, OnlineOrder
 from app.models.product import Product
+from app.models.resources import Branch, Category, Customer, Supplier
 from app.models.sale import Sale
+from app.models.sale_item import SaleItem
 from app.models.user import User
 from app.utils.invoice_generator import generate_platform_subscription_invoice_pdf, pdf_attachment
 
@@ -182,6 +186,43 @@ def list_businesses(
             )
         )
     return items
+
+
+@router.delete("/businesses/{business_id}", status_code=204)
+def delete_business(
+    business_id: UUID,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_super_admin),
+):
+    """Remove a shop and the records that belong to it."""
+    business = db.query(Business).filter(Business.id == business_id).first()
+    if not business:
+        raise HTTPException(status_code=404, detail="Business not found")
+
+    sale_ids = [row[0] for row in db.query(Sale.id).filter(Sale.business_id == business_id).all()]
+    product_ids = [row[0] for row in db.query(Product.id).filter(Product.business_id == business_id).all()]
+    item_filters = []
+    if sale_ids:
+        item_filters.append(SaleItem.sale_id.in_(sale_ids))
+    if product_ids:
+        item_filters.append(SaleItem.product_id.in_(product_ids))
+    if item_filters:
+        db.query(SaleItem).filter(or_(*item_filters)).delete(synchronize_session=False)
+
+    db.query(MpesaTransaction).filter(MpesaTransaction.business_id == business_id).delete(synchronize_session=False)
+    db.query(CashierShift).filter(CashierShift.business_id == business_id).delete(synchronize_session=False)
+    db.query(OnlineOrder).filter(OnlineOrder.business_id == business_id).delete(synchronize_session=False)
+    db.query(Notification).filter(Notification.business_id == business_id).delete(synchronize_session=False)
+    db.query(Sale).filter(Sale.business_id == business_id).delete(synchronize_session=False)
+    db.query(Product).filter(Product.business_id == business_id).delete(synchronize_session=False)
+    db.query(Category).filter(Category.business_id == business_id).delete(synchronize_session=False)
+    db.query(Supplier).filter(Supplier.business_id == business_id).delete(synchronize_session=False)
+    db.query(Customer).filter(Customer.business_id == business_id).delete(synchronize_session=False)
+    db.query(Branch).filter(Branch.business_id == business_id).delete(synchronize_session=False)
+    db.query(User).filter(User.business_id == business_id).delete(synchronize_session=False)
+    db.delete(business)
+    db.commit()
+    return None
 
 
 @router.post("/businesses/{business_id}/approve", response_model=AdminBusinessItem)

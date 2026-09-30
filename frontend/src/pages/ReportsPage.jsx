@@ -6,12 +6,14 @@ import {
 } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
 import api from '../api/client';
+import useSubscriptionStore from '../store/subscriptionStore';
 import { formatCurrency, formatDate } from '../utils/helpers';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
 
 const ReportsPage = () => {
+  const advancedReports = useSubscriptionStore((state) => state.hasFeature('advanced_reports'));
   const [dateRange, setDateRange] = useState('weekly');
   const [loading, setLoading] = useState(false);
   const [salesData, setSalesData] = useState([]);
@@ -101,9 +103,11 @@ const ReportsPage = () => {
   const dateOptions = [
     { value: 'today', label: 'Today' },
     { value: 'weekly', label: 'This Week' },
-    { value: 'monthly', label: 'This Month' },
-    { value: 'yearly', label: 'This Year' },
-    { value: 'all', label: 'All time' },
+    ...(advancedReports ? [
+      { value: 'monthly', label: 'This Month' },
+      { value: 'yearly', label: 'This Year' },
+      { value: 'all', label: 'All time' },
+    ] : []),
   ];
 
   return (
@@ -116,14 +120,16 @@ const ReportsPage = () => {
           </h1>
           <p className="text-gray-500 text-sm mt-1">Live sales data from your store</p>
         </div>
-        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-          <button type="button" onClick={downloadReport} className="btn-secondary flex items-center gap-2 flex-1 sm:flex-none justify-center">
-            <FaDownload /> Export
-          </button>
-          <button type="button" onClick={printReport} className="btn-primary flex items-center gap-2 flex-1 sm:flex-none justify-center">
-            <FaPrint /> Print
-          </button>
-        </div>
+        {advancedReports && (
+          <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+            <button type="button" onClick={downloadReport} className="btn-secondary flex items-center gap-2 flex-1 sm:flex-none justify-center">
+              <FaDownload /> Export
+            </button>
+            <button type="button" onClick={printReport} className="btn-primary flex items-center gap-2 flex-1 sm:flex-none justify-center">
+              <FaPrint /> Print
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">

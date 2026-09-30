@@ -11,7 +11,7 @@ from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.dependencies import get_current_business, get_current_user, get_pos_user
+from app.core.dependencies import get_current_business, get_current_user, get_pos_user, require_owner
 from app.models.business import Business
 from app.models.cashier_shift import CashierShift
 from app.models.sale import Sale
@@ -226,3 +226,21 @@ def list_shifts(
         query = query.filter(CashierShift.status == status_filter.upper())
     rows = query.order_by(desc(CashierShift.opened_at)).limit(limit).all()
     return [_shift_out(db, row, live=row.status == "OPEN") for row in rows]
+
+
+@router.delete("/{shift_id}", status_code=204)
+def delete_shift(
+    shift_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_owner),
+):
+    """Owners can remove a shift record. Sales from that shift stay in the books."""
+    shift = db.query(CashierShift).filter(
+        CashierShift.id == shift_id,
+        CashierShift.business_id == current_user.business_id,
+    ).first()
+    if not shift:
+        raise HTTPException(status_code=404, detail="Shift not found")
+    db.delete(shift)
+    db.commit()
+    return None

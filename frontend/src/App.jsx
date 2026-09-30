@@ -123,7 +123,7 @@ function App() {
           <Route path="branches" element={<FeatureRoute feature="business_settings"><BranchesPage /></FeatureRoute>} />
 
           {/* Inventory Pages */}
-          <Route path="categories" element={<FeatureRoute feature="inventory"><CategoriesPage /></FeatureRoute>} />
+          <Route path="categories" element={<FeatureRoute feature="products"><CategoriesPage /></FeatureRoute>} />
           <Route path="stock-management" element={<FeatureRoute feature="inventory"><StockManagementPage /></FeatureRoute>} />
           <Route path="suppliers" element={<FeatureRoute feature="suppliers"><SuppliersPage /></FeatureRoute>} />
 

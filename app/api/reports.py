@@ -3,13 +3,14 @@
 from datetime import datetime, timedelta
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_business, get_current_user
+from app.core.plans import plan_has_feature
 from app.models.business import Business
 from app.models.product import Product
 from app.models.sale import Sale
@@ -32,6 +33,16 @@ def _range_start(period: str) -> Optional[datetime]:
     return None  # all time
 
 
+def _guard_period(business: Business, period: str) -> None:
+    if period in {"today", "weekly"}:
+        return
+    if not plan_has_feature(business, "advanced_reports"):
+        raise HTTPException(
+            status_code=403,
+            detail="Monthly, yearly, and all-time reports are on the Professional plan and above.",
+        )
+
+
 @router.get("/summary")
 def report_summary(
     period: str = Query("monthly", pattern="^(today|weekly|monthly|yearly|all)$"),
@@ -39,6 +50,7 @@ def report_summary(
     business: Business = Depends(get_current_business),
     _: User = Depends(get_current_user),
 ):
+    _guard_period(business, period)
     start = _range_start(period)
     q = db.query(Sale).filter(Sale.business_id == business.id)
     if start:
@@ -124,6 +136,8 @@ def download_report(
     business: Business = Depends(get_current_business),
     current_user: User = Depends(get_current_user),
 ):
+    if not plan_has_feature(business, "advanced_reports"):
+        raise HTTPException(status_code=403, detail="Report export is on the Professional plan and above.")
     data = report_summary(period=period, db=db, business=business, _=current_user)
     s = data["summary"]
     rows = "".join(

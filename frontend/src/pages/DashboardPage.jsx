@@ -19,6 +19,24 @@ import {
   CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart
 } from 'recharts';
 
+const liveDateParts = (now = new Date()) => {
+  const today = now.toLocaleDateString('en-KE', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  const short = (date) => date.toLocaleDateString('en-KE', { month: 'short', day: 'numeric' });
+  return {
+    today,
+    week: `${short(monday)} – ${short(sunday)}, ${sunday.getFullYear()}`,
+  };
+};
+
 const DashboardPage = () => {
   const [stats, setStats] = useState({
     today_sales_count: 0,
@@ -40,7 +58,19 @@ const DashboardPage = () => {
   const [error, setError] = useState(null);
 
   const user = useAuthStore((state) => state.user);
+  const business = useAuthStore((state) => state.business);
   const isOwner = user?.role === 'OWNER';
+  const [liveDate, setLiveDate] = useState(() => liveDateParts());
+
+  useEffect(() => {
+    const refresh = () => setLiveDate(liveDateParts());
+    const timer = setInterval(refresh, 30000);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, []);
 
   useEffect(() => {
     fetchDashboardData();
@@ -261,7 +291,7 @@ const DashboardPage = () => {
         </div>
         <div className="dashboard-date-chip flex items-center gap-2 text-sm text-gray-500 bg-white px-4 py-2 rounded-lg border border-gray-100">
           <FaCalendarAlt />
-          <span>May 6 - May 12, 2025</span>
+          <span>{liveDate.today}</span>
         </div>
       </div>
 
@@ -363,7 +393,7 @@ const DashboardPage = () => {
           >
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-medium text-gray-700">This Week</h3>
-              <span className="text-xs text-gray-500">May 6 - May 12, 2025</span>
+              <span className="text-xs text-gray-500">{liveDate.week}</span>
             </div>
             <div className="h-48">
               <ResponsiveContainer width="100%" height="100%">
@@ -445,7 +475,7 @@ const DashboardPage = () => {
               </div>
               <div className="flex items-center justify-between py-2">
                 <span className="text-gray-500">Joined</span>
-                <span className="text-gray-700">Jan 2025</span>
+                <span className="text-gray-700">{business?.created_at ? formatDate(business.created_at) : '—'}</span>
               </div>
             </div>
           </motion.div>

@@ -13,12 +13,11 @@ PLAN_DEFINITIONS = {
         "features": {
             "pos",
             "products",
-            "inventory",
             "customers",
             "basic_reports",
             "business_settings",
         },
-        "limits": {"staff": 3, "branches": 1},
+        "limits": {"staff": 2, "branches": 1, "products": 100},
     },
     "PROFESSIONAL": {
         "name": "Professional",
@@ -30,10 +29,9 @@ PLAN_DEFINITIONS = {
             "suppliers",
             "basic_reports",
             "advanced_reports",
-            "multi_branch",
             "business_settings",
         },
-        "limits": {"staff": 15, "branches": 10},
+        "limits": {"staff": 10, "branches": 3, "products": None},
     },
     "ENTERPRISE": {
         "name": "Enterprise",

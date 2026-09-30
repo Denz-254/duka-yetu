@@ -31,6 +31,7 @@ const SuperAdminDashboard = () => {
   const [dealQuery, setDealQuery] = useState('');
   const [dealResults, setDealResults] = useState([]);
   const [rejectModal, setRejectModal] = useState({ open: false, id: null });
+  const [deleteModal, setDeleteModal] = useState({ open: false, id: null, name: '' });
   const [rejectReason, setRejectReason] = useState('');
 
   const loadFeatured = async () => {
@@ -167,6 +168,18 @@ const SuperAdminDashboard = () => {
       load();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Plan update failed');
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteModal.id) return;
+    try {
+      await api.delete(`/admin/businesses/${deleteModal.id}`);
+      toast.success('Business and its records deleted');
+      setDeleteModal({ open: false, id: null, name: '' });
+      load();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Could not delete this business');
     }
   };
 
@@ -514,6 +527,13 @@ const SuperAdminDashboard = () => {
                     {biz.approval_status !== 'REJECTED' && (
                       <button type="button" onClick={() => { setRejectModal({ open: true, id: biz.id }); setRejectReason(''); }} className="admin-action admin-action--danger"><FaTimes /> Reject</button>
                     )}
+                    <button
+                      type="button"
+                      onClick={() => setDeleteModal({ open: true, id: biz.id, name: biz.name })}
+                      className="admin-action admin-action--danger"
+                    >
+                      <FaTrash /> Delete
+                    </button>
                   </div>
                 </div>
               ))}
@@ -521,6 +541,19 @@ const SuperAdminDashboard = () => {
           )}
         </div>
       </main>
+
+      <Modal
+        open={deleteModal.open}
+        title="Delete business"
+        confirmLabel="Delete everything"
+        danger
+        onClose={() => setDeleteModal({ open: false, id: null, name: '' })}
+        onConfirm={confirmDelete}
+      >
+        <p>
+          Delete {deleteModal.name || 'this business'} and its staff, products, sales, orders, and shifts? This cannot be undone.
+        </p>
+      </Modal>
 
       <Modal
         open={rejectModal.open}

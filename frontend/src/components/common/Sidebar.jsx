@@ -61,7 +61,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
 
   const inventoryItems = [
     { path: '/products', icon: FaBoxes, label: 'All Products', feature: 'products', ownerOnly: true },
-    { path: '/categories', icon: FaTags, label: 'Categories', feature: 'inventory', ownerOnly: true },
+    { path: '/categories', icon: FaTags, label: 'Categories', feature: 'products', ownerOnly: true },
     { path: '/stock-management', icon: FaBarcode, label: 'Stock Management', feature: 'inventory', ownerOnly: true },
     { path: '/suppliers', icon: FaTruck, label: 'Suppliers', feature: 'suppliers', ownerOnly: true },
   ];

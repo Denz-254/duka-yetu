@@ -13,6 +13,8 @@ from sqlalchemy import or_
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.dependencies import get_current_user, require_owner
+from app.core.plans import plan_limit
+from app.models.business import Business
 from app.models.user import User
 from app.models.product import Product
 from app.models.resources import Category
@@ -85,6 +87,16 @@ async def create_product(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Product with SKU '{product_data.sku}' already exists"
         )
+
+    business = db.query(Business).filter(Business.id == current_user.business_id).first()
+    product_limit = plan_limit(business, "products") if business else None
+    if product_limit is not None:
+        product_count = db.query(Product).filter(Product.business_id == current_user.business_id).count()
+        if product_count >= product_limit:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Your {business.package.title()} plan allows up to {product_limit} products. Upgrade to add more.",
+            )
 
     product = Product(
         business_id=current_user.business_id,

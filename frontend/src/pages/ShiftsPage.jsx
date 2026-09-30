@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { FaClock, FaUser } from 'react-icons/fa';
+import { FaClock, FaTrash, FaUser } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
 import { shifts } from '../api/endpoints';
 import useAuthStore from '../store/authStore';
@@ -28,6 +28,18 @@ const ShiftsPage = () => {
   useEffect(() => {
     load();
   }, [filter]);
+
+  const removeShift = async (row) => {
+    const ok = window.confirm(`Delete ${row.cashier_name}'s shift from ${formatDate(row.opened_at)}? Sales stay in the books.`);
+    if (!ok) return;
+    try {
+      await shifts.remove(row.id);
+      toast.success('Shift deleted');
+      load();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Could not delete this shift');
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -108,6 +120,11 @@ const ShiftsPage = () => {
                         {row.status}
                       </span>
                       {row.notes && <p className="text-xs text-gray-400 mt-1 max-w-[180px] truncate">{row.notes}</p>}
+                      {isOwner && (
+                        <button type="button" onClick={() => removeShift(row)} className="mt-2 inline-flex items-center gap-1 text-xs text-red-600 hover:text-red-700">
+                          <FaTrash /> Delete
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))
@@ -177,6 +194,11 @@ const ShiftsPage = () => {
                     </span>
                   </div>
                   {row.notes && <p className="mt-2 text-xs text-gray-400">{row.notes}</p>}
+                  {isOwner && (
+                    <button type="button" onClick={() => removeShift(row)} className="mt-3 inline-flex items-center gap-1 text-sm text-red-600">
+                      <FaTrash /> Delete shift
+                    </button>
+                  )}
                 </div>
               </div>
             ))
