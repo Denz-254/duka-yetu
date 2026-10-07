@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
+from sqlalchemy import func
 from typing import Optional
 from pydantic import BaseModel, EmailStr, Field
 import logging
@@ -486,7 +487,7 @@ async def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(
     from app.core.config import settings
     from app.services.email import send_email
 
-    user = db.query(User).filter(User.email == str(request.email).lower()).first()
+    user = db.query(User).filter(func.lower(User.email) == str(request.email).strip().lower()).first()
     msg = "If that email exists, a reset link was sent."
     if not user:
         return {"message": msg}

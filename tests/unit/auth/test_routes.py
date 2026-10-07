@@ -5,6 +5,22 @@ import uuid
 
 from fastapi.testclient import TestClient
 
+def test_numeric_password_is_accepted():
+    """A password made only of digits must pass registration validation."""
+    from app.schemas.auth import BusinessRegistrationRequest
+
+    request = BusinessRegistrationRequest(
+        business_name="Number Shop",
+        owner_name="Number Owner",
+        username="numbershop",
+        email="Numbers@Example.com",
+        phone="0712345678",
+        password="12345678",
+    )
+    assert request.password == "12345678"
+    assert request.email == "numbers@example.com"
+
+
 def test_register(client: TestClient, test_session):
     """Test user registration."""
     response = client.post(

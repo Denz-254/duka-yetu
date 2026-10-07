@@ -167,6 +167,7 @@ const RegisterPage = () => {
                   value={formData.password}
                   onChange={handleChange}
                   placeholder="Min 8 characters"
+                  minLength={8}
                   required
                 />
                 <button

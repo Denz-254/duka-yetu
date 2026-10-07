@@ -110,12 +110,12 @@ class Settings(BaseSettings):
     PLATFORM_NOTIFY_EMAIL: str = Field(default="")
 
     # Platform subscription prices in KES (paid to platform M-Pesa)
-    PLAN_BASIC_MONTHLY_KES: int = Field(default=700)
-    PLAN_BASIC_YEARLY_KES: int = Field(default=7000)
-    PLAN_PROFESSIONAL_MONTHLY_KES: int = Field(default=1000)
-    PLAN_PROFESSIONAL_YEARLY_KES: int = Field(default=10000)
-    PLAN_ENTERPRISE_MONTHLY_KES: int = Field(default=1500)
-    PLAN_ENTERPRISE_YEARLY_KES: int = Field(default=15000)
+    PLAN_BASIC_MONTHLY_KES: int = Field(default=1000)
+    PLAN_BASIC_YEARLY_KES: int = Field(default=10000)
+    PLAN_PROFESSIONAL_MONTHLY_KES: int = Field(default=1700)
+    PLAN_PROFESSIONAL_YEARLY_KES: int = Field(default=17000)
+    PLAN_ENTERPRISE_MONTHLY_KES: int = Field(default=2500)
+    PLAN_ENTERPRISE_YEARLY_KES: int = Field(default=25000)
 
     # Use ConfigDict instead of class Config
     model_config = ConfigDict(

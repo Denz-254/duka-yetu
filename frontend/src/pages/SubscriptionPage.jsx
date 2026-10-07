@@ -31,18 +31,18 @@ const SubscriptionPage = () => {
       id: 'basic',
       name: 'Basic',
       icon: FaRocket,
-      price: { monthly: 700, yearly: 7000 },
-      description: 'A small shop: one counter, a short staff list, and today plus this week',
+      price: { monthly: 1000, yearly: 10000 },
+      description: 'A small shop: one branch, unlimited staff, and today plus this week',
       features: [
         { name: '1 branch', included: true },
-        { name: 'Up to 2 staff accounts', included: true },
+        { name: 'Unlimited staff accounts', included: true },
         { name: 'Up to 100 products', included: true },
         { name: 'POS and customers', included: true },
         { name: 'Today and weekly reports', included: true },
         { name: 'Stock tools and suppliers', included: false },
         { name: 'Monthly and yearly reports', included: false },
         { name: 'Report export', included: false },
-        { name: 'API access', included: false },
+        { name: 'Unlimited branches', included: false },
       ],
       popular: false,
       current: false,
@@ -52,18 +52,16 @@ const SubscriptionPage = () => {
       id: 'professional',
       name: 'Professional',
       icon: FaCrown,
-      price: { monthly: 1000, yearly: 10000 },
-      description: 'More staff, stock tools, suppliers, and full reports',
+      price: { monthly: 1700, yearly: 17000 },
+      description: 'Unlimited staff, stock tools, suppliers, and full reports',
       features: [
         { name: 'Up to 3 branches', included: true },
-        { name: 'Up to 10 staff accounts', included: true },
+        { name: 'Unlimited staff accounts', included: true },
         { name: 'Unlimited products', included: true },
         { name: 'Stock management', included: true },
         { name: 'Suppliers', included: true },
         { name: 'Monthly, yearly, and all-time reports', included: true },
         { name: 'Report export and print', included: true },
-        { name: 'API access', included: false },
-        { name: 'Custom integrations', included: false },
         { name: 'Unlimited branches', included: false },
       ],
       popular: true,
@@ -74,16 +72,13 @@ const SubscriptionPage = () => {
       id: 'enterprise',
       name: 'Enterprise',
       icon: FaGem,
-      price: { monthly: 1500, yearly: 15000 },
-      description: 'Unlimited staff and branches, plus API and data export',
+      price: { monthly: 2500, yearly: 25000 },
+      description: 'Unlimited staff and branches',
       features: [
         { name: 'Unlimited branches', included: true },
         { name: 'Unlimited staff', included: true },
         { name: 'Unlimited products', included: true },
         { name: 'Everything in Professional', included: true },
-        { name: 'API access', included: true },
-        { name: 'Custom integrations', included: true },
-        { name: 'Data export', included: true },
       ],
       popular: false,
       current: false,
@@ -302,7 +297,7 @@ const SubscriptionPage = () => {
 
                 <div className="mb-4">
                   <span className="text-3xl font-bold text-gray-800">
-                    KSh {billingCycle === 'monthly' ? plan.price.monthly : plan.price.yearly}
+                    KSh {(billingCycle === 'monthly' ? plan.price.monthly : plan.price.yearly).toLocaleString()}
                   </span>
                   <span className="text-gray-500 text-sm">
                     /{billingCycle === 'monthly' ? 'month' : 'year'}

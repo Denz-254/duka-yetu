@@ -34,16 +34,10 @@ class BusinessRegistrationRequest(BaseModel):
             raise ValueError('This field cannot be blank')
         return value
 
-    @field_validator('password')
+    @field_validator('email')
     @classmethod
-    def validate_password(cls, v: str) -> str:
-        if not any(c.isupper() for c in v):
-            raise ValueError('Password must contain at least one uppercase letter')
-        if not any(c.islower() for c in v):
-            raise ValueError('Password must contain at least one lowercase letter')
-        if not any(c.isdigit() for c in v):
-            raise ValueError('Password must contain at least one number')
-        return v
+    def normalize_email(cls, v: str) -> str:
+        return str(v).strip().lower()
 
 
 class LoginRequest(BaseModel):

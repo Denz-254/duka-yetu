@@ -99,11 +99,12 @@ const useAuthStore = create(
           localStorage.setItem('token', token.access_token);
           return { success: true, user, business, message };
         } catch (error) {
+          const message = getApiError(error, 'Registration failed');
           set({
-            error: error.response?.data?.detail || 'Registration failed',
+            error: message,
             loading: false,
           });
-          return { success: false, error: error.response?.data?.detail };
+          return { success: false, error: message };
         }
       },
 

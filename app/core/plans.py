@@ -17,7 +17,7 @@ PLAN_DEFINITIONS = {
             "basic_reports",
             "business_settings",
         },
-        "limits": {"staff": 2, "branches": 1, "products": 100},
+        "limits": {"staff": None, "branches": 1, "products": 100},
     },
     "PROFESSIONAL": {
         "name": "Professional",
@@ -31,7 +31,7 @@ PLAN_DEFINITIONS = {
             "advanced_reports",
             "business_settings",
         },
-        "limits": {"staff": 10, "branches": 3, "products": None},
+        "limits": {"staff": None, "branches": 3, "products": None},
     },
     "ENTERPRISE": {
         "name": "Enterprise",
@@ -45,9 +45,6 @@ PLAN_DEFINITIONS = {
             "advanced_reports",
             "multi_branch",
             "business_settings",
-            "api_access",
-            "custom_integrations",
-            "data_export",
         },
         "limits": {"staff": None, "branches": None},
     },
