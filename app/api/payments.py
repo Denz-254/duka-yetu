@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Optional, Union
@@ -22,6 +23,14 @@ from app.models.sale_item import SaleItem
 from app.models.user import User
 from app.schemas.mpesa import StkPushRequest, StkPushResponse, StkStatusResponse
 from app.schemas.sale import SaleItemResponse, SaleReceiptResponse
+from app.services.kopokopo import (
+    KopokopoError,
+    fetch_payment,
+    interpret_result,
+    kopokopo_ready,
+    request_stk,
+    signature_is_valid,
+)
 from app.services.mpesa import parse_stk_callback, seller_payment_destination
 from app.utils.receipt_generator import generate_receipt_html
 from app.api.sales import generate_receipt_number
@@ -71,6 +80,7 @@ def _complete_sale_from_payment(
         total_amount=_money(payment.amount),
         payment_method="MPESA",
         payment_status="PAID",
+        mpesa_receipt_number=payment.mpesa_receipt_number,
         sale_date=datetime.utcnow(),
     )
     db.add(sale)
@@ -147,14 +157,16 @@ def mpesa_collection_mode(
 ):
     """Tell the POS how this shop collects M-Pesa. Daraja is not involved."""
     destination = seller_payment_destination(business.settings or {}, business.phone or "")
+    stk = kopokopo_ready()
     return {
         "account_type": destination["account_type"],
         "send_money_phone": destination["send_money_phone"],
         "shortcode": destination["shortcode"],
         "account_number": destination["account_number"],
-        "configured": destination["configured"],
-        "stk_available": False,
-        "collection_mode": "manual",
+        "configured": destination["configured"] or stk,
+        "stk_available": stk,
+        "collection_mode": "kopokopo" if stk else "manual",
+        "sandbox": (settings.KOPOKOPO_ENVIRONMENT or "").lower() != "production",
         "mpesa_enabled": destination["mpesa_enabled"],
     }
 
@@ -167,18 +179,90 @@ async def stk_push(
     business: Business = Depends(get_current_business),
     _access: Business = Depends(require_feature("pos")),
 ):
-    """
-    Seller checkout does not use STK Push.
+    """Send a KopoKopo STK request. The sale is created only after KopoKopo confirms it."""
+    if not kopokopo_ready():
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "KopoKopo is not configured. Set KOPOKOPO_CLIENT_ID, "
+                "KOPOKOPO_CLIENT_SECRET, and KOPOKOPO_TILL_NUMBER."
+            ),
+        )
 
-    A Daraja prompt can only credit the shortcode that owns the passkey.
-    Shops collect on their own Paybill, Till, or phone, then mark the sale paid.
-    """
-    raise HTTPException(
-        status_code=400,
-        detail=(
-            "Customer payments are confirmed manually. Show the Paybill, Till, or "
-            "Send Money instructions, wait for the M-Pesa message, then mark the sale as paid."
-        ),
+    items_snapshot = []
+    total = Decimal("0.00")
+    for item in payload.items:
+        product = db.query(Product).filter(
+            Product.id == item.product_id,
+            Product.business_id == business.id,
+            Product.is_active == True,  # noqa: E712
+        ).first()
+        if not product:
+            raise HTTPException(status_code=404, detail="A product in the cart was not found")
+        if product.stock_quantity < item.quantity:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Insufficient stock for {product.name}. Available: {product.stock_quantity}",
+            )
+        unit_price = _money(product.selling_price)
+        subtotal = _money(unit_price * item.quantity)
+        total += subtotal
+        items_snapshot.append({
+            "product_id": str(product.id),
+            "name": product.name,
+            "quantity": item.quantity,
+            "unit_price": str(unit_price),
+            "subtotal": str(subtotal),
+        })
+
+    payment = MpesaTransaction(
+        business_id=business.id,
+        user_id=current_user.id,
+        phone_number=payload.phone_number,
+        amount=total,
+        account_reference="POS",
+        description="POS Payment",
+        status="PENDING",
+        source="POS",
+        cart_snapshot={"items": items_snapshot},
+        callback_payload={},
+    )
+    db.add(payment)
+    db.flush()
+
+    first, _, last = (current_user.name or "Customer").partition(" ")
+    try:
+        location = await request_stk(
+            phone=payload.phone_number,
+            amount=total,
+            first_name=first or "Customer",
+            last_name=last or "Buyer",
+            reference=str(payment.id),
+        )
+    except KopokopoError as exc:
+        db.rollback()
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    payment.checkout_request_id = location.rstrip("/").split("/")[-1][:100]
+    payment.cart_snapshot = {"items": items_snapshot, "kopokopo_location": location}
+    db.commit()
+    db.refresh(payment)
+
+    sandbox = (settings.KOPOKOPO_ENVIRONMENT or "").lower() != "production"
+    message = (
+        "Sandbox accepted the request. No PIN prompt is sent to a real phone. "
+        "This screen will close the sale when KopoKopo marks it received."
+        if sandbox
+        else "Ask the customer to enter their M-Pesa PIN."
+    )
+    return StkPushResponse(
+        payment_id=str(payment.id),
+        checkout_request_id=payment.checkout_request_id,
+        merchant_request_id=None,
+        phone_number=payment.phone_number,
+        amount=payment.amount,
+        status=payment.status,
+        customer_message=message,
     )
 
 
@@ -195,6 +279,33 @@ async def stk_status(
     ).first()
     if not payment:
         raise HTTPException(status_code=404, detail="Payment not found")
+
+    if payment.status == "PENDING":
+        location = (payment.cart_snapshot or {}).get("kopokopo_location")
+        if location:
+            try:
+                result = interpret_result(await fetch_payment(location))
+            except KopokopoError as exc:
+                result = {"state": "pending", "message": str(exc), "receipt": None, "phone": None}
+            if result["state"] == "success":
+                if result.get("receipt"):
+                    payment.mpesa_receipt_number = str(result["receipt"])[:50]
+                if result.get("phone"):
+                    payment.phone_number = str(result["phone"])[:20]
+                payment.result_desc = result["message"]
+                try:
+                    _complete_sale_from_payment(db, payment, current_user)
+                except Exception as exc:  # noqa: BLE001
+                    payment.status = "FAILED"
+                    payment.result_desc = f"Paid but the sale could not be saved: {exc}"
+                    payment.completed_at = datetime.utcnow()
+                    db.commit()
+            elif result["state"] == "failed":
+                payment.status = "FAILED"
+                payment.result_desc = result["message"]
+                payment.completed_at = datetime.utcnow()
+                db.commit()
+            db.refresh(payment)
 
     sale_response = None
     if payment.status == "COMPLETED" and payment.sale_id:
@@ -213,6 +324,51 @@ async def stk_status(
         created_at=payment.created_at,
         completed_at=payment.completed_at,
     )
+
+
+@router.post("/kopokopo/callback")
+async def kopokopo_callback(request: Request, db: Session = Depends(get_db)):
+    """KopoKopo posts the STK result here. Sandbox tests can also poll instead."""
+    raw = await request.body()
+    signature = request.headers.get("x-kopokopo-signature", "")
+    if signature and not signature_is_valid(raw, signature):
+        raise HTTPException(status_code=401, detail="Invalid KopoKopo signature")
+    try:
+        body = json.loads(raw.decode() or "{}")
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail="Invalid JSON") from exc
+
+    result = interpret_result(body if isinstance(body, dict) else {})
+    data = body.get("data") if isinstance(body, dict) else {}
+    attributes = (data or {}).get("attributes") or {}
+    metadata = attributes.get("metadata") or {}
+    reference = str(metadata.get("reference") or "")
+    payment = None
+    if reference:
+        try:
+            payment = db.query(MpesaTransaction).filter(MpesaTransaction.id == UUID(reference)).first()
+        except ValueError:
+            payment = None
+    if not payment or payment.status in {"COMPLETED", "FAILED"}:
+        return {"status": "accepted"}
+
+    payment.callback_payload = body
+    if result["state"] == "success":
+        if result.get("receipt"):
+            payment.mpesa_receipt_number = str(result["receipt"])[:50]
+        try:
+            _complete_sale_from_payment(db, payment)
+        except Exception as exc:  # noqa: BLE001
+            payment.status = "FAILED"
+            payment.result_desc = f"Paid but the sale could not be saved: {exc}"
+            payment.completed_at = datetime.utcnow()
+            db.commit()
+    elif result["state"] == "failed":
+        payment.status = "FAILED"
+        payment.result_desc = result["message"]
+        payment.completed_at = datetime.utcnow()
+        db.commit()
+    return {"status": "accepted"}
 
 
 @router.post("/mpesa/callback")

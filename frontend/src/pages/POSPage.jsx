@@ -24,6 +24,8 @@ const POSPage = () => {
   const [receiptData, setReceiptData] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState('CASH');
   const [mpesaReceipt, setMpesaReceipt] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [stkMessage, setStkMessage] = useState('');
   const [mpesaMode, setMpesaMode] = useState({
     account_type: 'paybill',
     send_money_phone: '',
@@ -82,7 +84,12 @@ const POSPage = () => {
       return;
     }
 
-    if (payingWithMpesa && !mpesaMode.configured) {
+    if (payingWithMpesa && mpesaMode.stk_available && !customerPhone.trim()) {
+      toast.error('Enter the customer M-Pesa phone number');
+      return;
+    }
+
+    if (payingWithMpesa && !mpesaMode.stk_available && !mpesaMode.configured) {
       toast.error('Set a Paybill, Till, or Send Money number in Payment Settings');
       return;
     }
@@ -94,16 +101,44 @@ const POSPage = () => {
         quantity: item.quantity,
       }));
 
-      const response = await api.post('/sales/', {
-        items: cartItems,
-        payment_method: payingWithMpesa ? mobileMethod : paymentMethod,
-        mpesa_receipt_number: payingWithMpesa ? mpesaReceipt.trim() : undefined,
-      });
+      let response;
+      if (payingWithMpesa && mpesaMode.stk_available) {
+        const started = await payments.mpesaStkPush({
+          items: cartItems,
+          phone_number: customerPhone.trim(),
+        });
+        setStkMessage(started.data.customer_message || 'Waiting for KopoKopo...');
+        let settled = null;
+        for (let attempt = 0; attempt < 20; attempt += 1) {
+          const status = await payments.mpesaStatus(started.data.payment_id);
+          if (status.data.status === 'COMPLETED' && status.data.sale) {
+            settled = status.data.sale;
+            break;
+          }
+          if (status.data.status === 'FAILED') {
+            throw new Error(status.data.result_desc || 'M-Pesa payment failed');
+          }
+          setStkMessage(status.data.result_desc || 'Waiting for KopoKopo to confirm...');
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+        }
+        if (!settled) {
+          throw new Error('KopoKopo has not confirmed this payment yet. Check the sale before charging again.');
+        }
+        response = { data: settled };
+      } else {
+        response = await api.post('/sales/', {
+          items: cartItems,
+          payment_method: payingWithMpesa ? mobileMethod : paymentMethod,
+          mpesa_receipt_number: payingWithMpesa ? mpesaReceipt.trim() : undefined,
+        });
+      }
       setReceiptData(response.data);
       setShowReceipt(true);
       clearCart();
       setMpesaReceipt('');
-      toast.success(payingWithMpesa ? 'Marked as paid' : 'Sale completed successfully!');
+      setCustomerPhone('');
+      setStkMessage('');
+      toast.success(payingWithMpesa ? 'M-Pesa payment confirmed' : 'Sale completed successfully!');
       fetchProducts();
       setShiftRefresh((n) => n + 1);
     } catch (error) {
@@ -329,7 +364,29 @@ const POSPage = () => {
                   </div>
                 </div>
 
-                {payingWithMpesa && (
+                {payingWithMpesa && mpesaMode.stk_available && (
+                  <div className="mt-4 p-3 rounded-lg border border-green-100 bg-green-50 space-y-2">
+                    <p className="text-sm font-medium text-gray-800">Send M-Pesa prompt</p>
+                    <p className="text-sm text-gray-600">
+                      {mpesaMode.sandbox
+                        ? 'Sandbox mode does not send a PIN prompt to a real phone. The sale closes when KopoKopo simulates the payment.'
+                        : 'The customer enters their M-Pesa PIN. The sale closes when the payment is confirmed.'}
+                    </p>
+                    <label className="text-sm font-medium text-gray-700 block">Customer phone</label>
+                    <input
+                      type="tel"
+                      value={customerPhone}
+                      onChange={(e) => setCustomerPhone(e.target.value)}
+                      className="input-primary bg-white text-gray-800"
+                      placeholder="07XXXXXXXX"
+                      disabled={loading}
+                      autoComplete="off"
+                    />
+                    {stkMessage && <p className="text-xs text-primary-700">{stkMessage}</p>}
+                  </div>
+                )}
+
+                {payingWithMpesa && !mpesaMode.stk_available && (
                   <div className="mt-4 p-3 rounded-lg border border-green-100 bg-green-50 space-y-2">
                     <p className="text-sm font-medium text-gray-800">Customer pays, then you confirm</p>
                     <ol className="list-decimal pl-4 text-sm text-gray-700 space-y-1">
@@ -371,7 +428,7 @@ const POSPage = () => {
                     ) : (
                       <>
                         <FaReceipt />
-                        {payingWithMpesa ? 'Mark as paid' : 'Complete Sale'}
+                        {payingWithMpesa && mpesaMode.stk_available ? 'Send M-Pesa prompt' : payingWithMpesa ? 'Mark as paid' : 'Complete Sale'}
                       </>
                     )}
                   </button>

@@ -92,6 +92,15 @@ class Settings(BaseSettings):
     MPESA_PASSKEY: str = Field(default="")
     MPESA_SHORTCODE: str = Field(default="174379")
 
+    # KopoKopo STK for customer checkout. Sandbox does not prompt a real phone.
+    KOPOKOPO_ENVIRONMENT: str = Field(default="sandbox")  # sandbox | production
+    KOPOKOPO_BASE_URL: str = Field(default="https://sandbox.kopokopo.com")
+    KOPOKOPO_CLIENT_ID: str = Field(default="")
+    KOPOKOPO_CLIENT_SECRET: str = Field(default="")
+    KOPOKOPO_API_KEY: str = Field(default="")
+    KOPOKOPO_TILL_NUMBER: str = Field(default="")
+    KOPOKOPO_CALLBACK_BASE_URL: str = Field(default="")
+
     # Super admin bootstrap credentials
     SUPER_ADMIN_USERNAME: str = Field(default="superadmin")
     SUPER_ADMIN_PASSWORD: str = Field(default="")
